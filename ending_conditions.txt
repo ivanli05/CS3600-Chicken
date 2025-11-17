@@ -1,0 +1,5 @@
+1. A chicken makes an invalid move.  The game is terminated and that chicken loses.
+2. A chicken runs out of time. The game is terminated and that chicken loses.
+3. Both chickens have made 40 moves. The game is terminated and the chicken with the most eggs wins.
+4. A chicken has no valid moves.  Its enemy is given 5 eggs, the game is terminated, and the chicken with the most eggs wins. (Note this is a bigger penalty than was listed in version 1.0 of the rules.)
+5. If a chicken steps on a trapdoor and cannot occupy the square it spawned on, the enemy is given the 4 eggs (that it always gets when its enemy steps on a trapdoor), the game is terminated, and the chicken with the most eggs wins.
