@@ -251,8 +251,6 @@ class PlayerAgent:
         # Plain moves: Only if necessary to reach egg-laying positions
         else:
             # IMPORTANT: We can move to squares with our own eggs using PLAIN moves
-            # This is allowed by the game rules (plain moves return True before checking own eggs)
-            # Check if we're moving to a square with our own egg - this is fine and helps exploration
             if new_loc in board.eggs_player:
                 score += 5  # Moving over our own eggs is fine, helps us explore
             
