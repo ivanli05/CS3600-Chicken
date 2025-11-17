@@ -321,7 +321,7 @@ class PlayerAgent:
         valid_moves = board.get_valid_moves()
         
         if not valid_moves:
-            # No valid moves - this shouldn't happen, but return a safe default
+            # No valid moves (this shouldn't happen)
             print("No valid moves available!")
             return (Direction.UP, MoveType.PLAIN)
         
@@ -338,8 +338,6 @@ class PlayerAgent:
             moves_to_evaluate = safe_egg_moves
         else:
             # If no safe egg moves, consider all moves but prioritize safe ones
-            # IMPORTANT: We can move to squares with our own eggs using PLAIN moves
-            # This helps us explore and find new egg-laying opportunities
             # Prioritize plain moves that get us to new areas or closer to egg-laying positions
             moves_to_evaluate = valid_moves
             print("No safe egg moves available - exploring to find new opportunities.")
