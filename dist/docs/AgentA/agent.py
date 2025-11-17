@@ -8,7 +8,7 @@ import engine.game.board as board_module
 
 """
 AgentA is an advanced strategic agent designed to consistently win by maximizing eggs.
-Key strategies (inspired by advanced game AI techniques):
+Key strategies:
 1. Aggressive egg-laying: Always lay eggs when possible (especially corners worth 3x)
 2. Look-ahead evaluation: Use forecast_move to evaluate future positions
 3. Pathfinding to corners: Calculate shortest paths to valuable corner positions
