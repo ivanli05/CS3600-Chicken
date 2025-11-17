@@ -3,7 +3,6 @@ from typing import List, Set, Tuple, Optional, Dict
 import numpy as np
 from game import *
 from engine.game.enums import Direction, MoveType, loc_after_direction
-from engine.game.board import manhattan_distance
 import engine.game.board as board_module
 
 """
@@ -21,7 +20,7 @@ Key strategies:
 
 class PlayerAgent:
     """
-    AgentA - A strategic agent focused on maximizing eggs to win.
+    AgentA - An agent focused on maximizing eggs to win
     """
 
     def __init__(self, board: board_module.Board, time_left: Callable):
@@ -291,7 +290,7 @@ class PlayerAgent:
         time_left: Callable,
     ):
         """
-        Main play method - returns the best move according to strategy.
+        Main play method - returns the best move
         """
         location = board.chicken_player.get_location()
         print(f"I'm at {location}.")
