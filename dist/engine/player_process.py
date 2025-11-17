@@ -157,13 +157,6 @@ def run_player_process(
     import psutil
 
     sys.path.append(submission_dir)
-    # Add parent directory (dist) to path so agents can import engine.game modules
-    # __file__ is dist/engine/player_process.py
-    # dirname gives dist/engine, parent gives dist
-    engine_dir = os.path.dirname(__file__)
-    parent_dir = os.path.dirname(engine_dir)
-    if parent_dir not in sys.path:
-        sys.path.insert(0, parent_dir)
 
     print(use_gpu)
 

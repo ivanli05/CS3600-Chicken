@@ -1,10 +1,10 @@
 from collections.abc import Callable
-from typing import List, Set, Tuple, Optional
+from typing import List, Set, Tuple, Optional, Dict
 import numpy as np
-from engine.game import *
-from engine.game.enums import Direction, MoveType, loc_after_direction
-from engine.game.board import manhattan_distance
-import engine.game.board as board_module
+from game import *
+from game.enums import Direction, MoveType, loc_after_direction
+from game.board import manhattan_distance
+import game.board as board_module
 
 """
 AgentA is an advanced strategic agent designed to consistently win by maximizing eggs.
@@ -34,7 +34,7 @@ class PlayerAgent:
         # Track recent positions to avoid getting stuck in loops
         self.recent_positions: List[Tuple[int, int]] = []
         # Track visit count for each position to discourage revisiting
-        self.position_visit_count: dict[Tuple[int, int], int] = {}
+        self.position_visit_count: Dict[Tuple[int, int], int] = {}
 
     def _is_corner(self, loc: Tuple[int, int], map_size: int) -> bool:
         """Check if location is a corner (worth 3 eggs instead of 1)"""

@@ -306,19 +306,19 @@ def play_game(
         terminate_game(
             player_a_process, player_b_process, queues, out_queue, stop_event
         )
-        return game_board, trapdoor_locations, spawns, message_a, message_b
+        return game_board, message_a, message_b
     elif not success_a:
         game_board.set_winner(ResultArbiter.PLAYER_B, WinReason.FAILED_INIT)
         terminate_game(
             player_a_process, player_b_process, queues, out_queue, stop_event
         )
-        return game_board, trapdoor_locations, spawns, message_a, message_b
+        return game_board, message_a, message_b
     elif not success_b:
         game_board.set_winner(ResultArbiter.PLAYER_A, WinReason.FAILED_INIT)
         terminate_game(
             player_a_process, player_b_process, queues, out_queue, stop_event
         )
-        return game_board, trapdoor_locations, spawns, message_a, message_b
+        return game_board, message_a, message_b
 
     # start actual gameplay
     #
