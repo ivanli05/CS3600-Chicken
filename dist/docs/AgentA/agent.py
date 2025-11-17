@@ -2,9 +2,9 @@ from collections.abc import Callable
 from typing import List, Set, Tuple, Optional, Dict
 import numpy as np
 from game import *
-from game.enums import Direction, MoveType, loc_after_direction
-from game.board import manhattan_distance
-import game.board as board_module
+from engine.game.enums import Direction, MoveType, loc_after_direction
+from engine.game.board import manhattan_distance
+import engine.game.board as board_module
 
 """
 AgentA is an advanced strategic agent designed to consistently win by maximizing eggs.
