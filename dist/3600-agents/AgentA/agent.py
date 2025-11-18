@@ -17,7 +17,6 @@ Key strategies:
 7. Position evaluation: Consider board control and future opportunities
 """
 
-
 class PlayerAgent:
     """
     AgentA - An agent focused on maximizing eggs to win
