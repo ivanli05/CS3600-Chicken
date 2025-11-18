@@ -1,0 +1,73 @@
+# Training Configuration for H100 GPU
+# 6-hour training run
+
+# Data
+data:
+  train_file: "training_data.json"
+  num_positions: 50000  # 50k positions for 6-hour run
+  val_split: 0.15
+  test_split: 0.10
+  augment: true
+  noise_level: 0.02
+
+# Model Architecture
+model:
+  input_size: 128
+  hidden_size: 256
+  num_residual_blocks: 2
+  dropout: 0.2
+
+# Training
+training:
+  epochs: 200  # ~4 hours on H100
+  batch_size: 256  # Optimal for H100
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  gradient_clip: 1.0
+
+  # Mixed precision for H100 speed
+  use_amp: true  # Automatic Mixed Precision (FP16)
+
+  # Optimizer
+  optimizer: "adamw"
+  betas: [0.9, 0.999]
+
+  # Learning rate schedule
+  scheduler:
+    type: "reduce_on_plateau"
+    factor: 0.5
+    patience: 10
+    min_lr: 0.00001
+
+  # Early stopping
+  early_stopping:
+    patience: 25
+    min_delta: 0.0001
+
+# Checkpointing
+checkpoint:
+  save_every_n_epochs: 10
+  save_every_n_minutes: 30
+  keep_best: 3  # Keep top 3 models
+
+# Logging
+logging:
+  use_tensorboard: true
+  tensorboard_dir: "runs"
+  log_every_n_batches: 10
+  print_every_n_epochs: 1
+
+# Hardware
+hardware:
+  device: "cuda"  # H100
+  num_workers: 8  # Data loading threads
+  pin_memory: true
+
+# Data Generation (for generate_data_parallel.py)
+data_generation:
+  num_positions: 50000
+  depth_for_labels: 6
+  num_processes: 16  # Parallel workers
+  min_moves: 5
+  max_moves: 35
+  scenarios_per_position: 3  # Trapdoor variations
