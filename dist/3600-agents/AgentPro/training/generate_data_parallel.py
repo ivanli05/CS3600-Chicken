@@ -161,11 +161,41 @@ def extract_features(board, agent):
         return np.zeros(128, dtype=np.float32)
 
 
+def _setup_worker_paths():
+    """
+    Set up import paths for worker processes.
+    This is needed because multiprocessing workers don't inherit sys.path modifications.
+    """
+    import sys
+    import os
+
+    # Calculate paths relative to this file
+    training_dir = os.path.dirname(os.path.abspath(__file__))
+    agentpro_dir = os.path.dirname(training_dir)
+    agents_dir = os.path.dirname(agentpro_dir)
+    dist_dir = os.path.dirname(agents_dir)
+    engine_dir = os.path.join(dist_dir, 'engine')
+
+    # Add to sys.path if not already there
+    if engine_dir not in sys.path:
+        sys.path.insert(0, engine_dir)
+    if agents_dir not in sys.path:
+        sys.path.insert(0, agents_dir)
+
+
 def generate_single_position(args):
     """
     Generate one training example.
     Called by worker processes.
     """
+    # CRITICAL: Set up paths in worker process
+    _setup_worker_paths()
+
+    # Now import modules (must be after path setup)
+    from game.board import Board
+    from AgentPro.agent import PlayerAgent
+    import numpy as np
+
     worker_id, position_id, depth, min_moves, max_moves = args
 
     try:
@@ -195,6 +225,8 @@ def generate_single_position(args):
 
     except Exception as e:
         print(f"Error in worker {worker_id}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
