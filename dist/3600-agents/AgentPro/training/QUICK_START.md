@@ -2,6 +2,24 @@
 
 ## Local Testing (Your Laptop)
 
+### Option 1: Automated Testing (Recommended)
+
+```bash
+# Run the automated test script (does everything for you!)
+python test_local.py
+```
+
+This script will:
+- ✓ Check Python version (needs 3.10+)
+- ✓ Check dependencies
+- ✓ Generate 100 test positions (~2-5 min)
+- ✓ Train model for 20 epochs (~5-10 min)
+- ✓ Verify all outputs
+
+**Total time: ~10-15 minutes**
+
+### Option 2: Manual Testing
+
 ```bash
 # 1. Install dependencies
 pip install -r ../../../requirements.txt
