@@ -18,8 +18,12 @@ import argparse
 from pathlib import Path
 from datetime import datetime, timedelta
 
-# Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+# Add paths to import agent modules
+# From training/ we need to go up to AgentPro/ to import evaluator
+training_dir = os.path.dirname(os.path.abspath(__file__))
+agentpro_dir = os.path.dirname(training_dir)  # AgentPro/
+
+sys.path.insert(0, agentpro_dir)  # For 'from evaluator import PositionEvaluator'
 
 import torch
 import torch.nn as nn

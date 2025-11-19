@@ -15,14 +15,21 @@ import argparse
 from multiprocessing import Pool, Manager, cpu_count
 from pathlib import Path
 
-# Add paths
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../..'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+# Add paths to import game engine and agent modules
+# From training/ we need to go up to dist/ then into engine/
+training_dir = os.path.dirname(os.path.abspath(__file__))
+agentpro_dir = os.path.dirname(training_dir)  # AgentPro/
+agents_dir = os.path.dirname(agentpro_dir)     # 3600-agents/
+dist_dir = os.path.dirname(agents_dir)         # dist/
+engine_dir = os.path.join(dist_dir, 'engine')  # dist/engine/
+
+sys.path.insert(0, engine_dir)      # For 'from game import Board'
+sys.path.insert(0, agents_dir)      # For 'from AgentPro.agent import PlayerAgent'
 
 import numpy as np
 from game import Board
 from game.enums import Direction, MoveType
-from agent import PlayerAgent
+from AgentPro.agent import PlayerAgent
 
 
 def generate_random_position(min_moves=5, max_moves=35):
