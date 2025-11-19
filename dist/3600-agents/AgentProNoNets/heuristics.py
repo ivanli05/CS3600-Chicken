@@ -137,30 +137,69 @@ class MoveEvaluator:
             
             # 3.5. AVOID STAYING AROUND KNOWN TRAPDOORS - explore outwards!
             # Once we know where trapdoors are, move away from them
+            # Add pseudo-randomness based on location hash to break diamond patterns
+            # This makes different escape directions more attractive without true randomness
             if trapdoor_tracker.known_trapdoors:
                 min_dist_to_trapdoor = min(
                     abs(new_loc[0] - trap[0]) + abs(new_loc[1] - trap[1])
                     for trap in trapdoor_tracker.known_trapdoors
                 )
                 
+                # Generate pseudo-random value from location hash (deterministic but varied)
+                # This breaks diamond patterns by making different escape directions more attractive
+                location_hash = hash(new_loc) % 1000
+                location_random = 0.8 + (location_hash % 40) / 100.0  # 0.8 to 1.2 (20% variation)
+                escape_random = 0.9 + (location_hash % 40) / 100.0  # 0.9 to 1.3 (30% variation)
+                exploration_random = 1.0 + (location_hash % 50) / 100.0  # 1.0 to 1.5 (50% variation)
+                
                 # STRONG penalty for being near known trapdoors (within 2 squares)
                 # This encourages moving away from trapdoor areas
                 if min_dist_to_trapdoor <= 1:
                     score -= 2000.0  # Very strong penalty - don't stay adjacent to trapdoors!
+                    # Add small pseudo-random variation to penalty to break patterns
+                    penalty_variation = (location_hash % 200)
+                    score -= penalty_variation * location_random
                 elif min_dist_to_trapdoor <= 2:
                     score -= 800.0  # Strong penalty - avoid staying close to trapdoors
+                    # Add small pseudo-random variation
+                    penalty_variation = (location_hash % 150)
+                    score -= penalty_variation * location_random
                 elif min_dist_to_trapdoor <= 3:
                     score -= 300.0  # Moderate penalty
+                    # Add small pseudo-random variation
+                    penalty_variation = (location_hash % 100)
+                    score -= penalty_variation * location_random
                 
                 # BONUS for moving far away from known trapdoors (encourages exploration)
+                # Add pseudo-randomness to make different escape directions more attractive
                 if min_dist_to_trapdoor >= 5:
-                    score += 200.0  # Good bonus for getting far from trapdoors
+                    base_bonus = 200.0  # Good bonus for getting far from trapdoors
+                    score += base_bonus * escape_random
                 elif min_dist_to_trapdoor >= 4:
-                    score += 100.0  # Decent bonus
+                    base_bonus = 100.0  # Decent bonus
+                    score += base_bonus * escape_random
                 
                 # EXTRA exploration bonus when moving away from trapdoors to new areas
-                if min_dist_to_trapdoor >= 3 and (visited_squares is None or new_loc not in visited_squares):
-                    score += 150.0  # Strong bonus for exploring new areas away from trapdoors
+                # Add significant pseudo-randomness to encourage varied exploration paths
+                if min_dist_to_trapdoor >= 3:
+                    if visited_squares is None or new_loc not in visited_squares:
+                        # Strong bonus for exploring new areas away from trapdoors
+                        # Add pseudo-randomness to break diamond patterns
+                        score += 150.0 * exploration_random
+                    else:
+                        # Even if visited, still give some bonus for moving away (with variation)
+                        score += 50.0 * escape_random
+                
+                # ADDITIONAL: Pseudo-random exploration incentive when near trapdoors
+                # This helps break diamond patterns by making some directions more attractive
+                if min_dist_to_trapdoor <= 3:
+                    # Add a pseudo-random exploration bonus that varies by location
+                    # This makes the agent try different escape paths
+                    exploration_bonus = (location_hash % 200) - 50  # -50 to +150
+                    if visited_squares is None or new_loc not in visited_squares:
+                        # Stronger pseudo-random bonus for new areas
+                        exploration_bonus = 50 + (location_hash % 150)  # 50 to 200
+                    score += exploration_bonus
 
         # 4. Positional factors
         # Moving toward center is good (more options)
