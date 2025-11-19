@@ -23,11 +23,11 @@ agents_dir = os.path.dirname(agentpro_dir)     # 3600-agents/
 dist_dir = os.path.dirname(agents_dir)         # dist/
 engine_dir = os.path.join(dist_dir, 'engine')  # dist/engine/
 
-sys.path.insert(0, engine_dir)      # For 'from game import Board'
+sys.path.insert(0, engine_dir)      # For 'from game.board import Board'
 sys.path.insert(0, agents_dir)      # For 'from AgentPro.agent import PlayerAgent'
 
 import numpy as np
-from game import Board
+from game.board import Board
 from game.enums import Direction, MoveType
 from AgentPro.agent import PlayerAgent
 
