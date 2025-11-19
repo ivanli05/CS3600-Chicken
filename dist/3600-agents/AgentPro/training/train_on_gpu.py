@@ -29,7 +29,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
-from torch.utils.tensorboard import SummaryWriter
 from torch.cuda.amp import autocast, GradScaler
 
 import numpy as np
@@ -165,8 +164,7 @@ class Trainer:
             mode='min',
             factor=config['training']['scheduler']['factor'],
             patience=config['training']['scheduler']['patience'],
-            min_lr=config['training']['scheduler']['min_lr'],
-            verbose=True
+            min_lr=config['training']['scheduler']['min_lr']
         )
 
         # Loss function
@@ -180,9 +178,15 @@ class Trainer:
 
         # TensorBoard
         if config['logging']['use_tensorboard']:
-            log_dir = Path(config['logging']['tensorboard_dir']) / datetime.now().strftime('%Y%m%d_%H%M%S')
-            self.writer = SummaryWriter(log_dir)
-            print(f"TensorBoard logging to: {log_dir}")
+            try:
+                from torch.utils.tensorboard import SummaryWriter
+                log_dir = Path(config['logging']['tensorboard_dir']) / datetime.now().strftime('%Y%m%d_%H%M%S')
+                self.writer = SummaryWriter(log_dir)
+                print(f"TensorBoard logging to: {log_dir}")
+            except ImportError:
+                print("Warning: tensorboard not installed. Install with: pip install tensorboard")
+                print("Disabling TensorBoard logging...")
+                self.writer = None
         else:
             self.writer = None
 
