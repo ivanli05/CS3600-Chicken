@@ -187,46 +187,129 @@ def generate_single_position(args):
     """
     Generate one training example.
     Called by worker processes.
+
+    NOTE: This function must be self-contained for multiprocessing to work.
+    It cannot reference module-level functions directly.
     """
     # CRITICAL: Set up paths in worker process
     _setup_worker_paths()
 
     # Now import modules (must be after path setup)
     from game.board import Board
+    from game.enums import MoveType
     from AgentPro.agent import PlayerAgent
     import numpy as np
+    import random
 
     worker_id, position_id, depth, min_moves, max_moves = args
 
     try:
-        # Generate random position
-        board = generate_random_position(min_moves, max_moves)
-        if board is None:
+        # Generate random position (inline implementation)
+        board = Board()
+        num_moves = random.randint(min_moves, max_moves)
+
+        for _ in range(num_moves):
+            valid_moves = board.get_valid_moves()
+            if not valid_moves:
+                break
+
+            # Weighted random: prefer egg moves
+            move_weights = []
+            for move in valid_moves:
+                if move[1] == MoveType.EGG:
+                    move_weights.append(3.0)
+                elif move[1] == MoveType.TURD:
+                    move_weights.append(1.5)
+                else:
+                    move_weights.append(1.0)
+
+            total = sum(move_weights)
+            move_probs = [w / total for w in move_weights]
+            move = random.choices(valid_moves, weights=move_probs, k=1)[0]
+
+            board = board.forecast_move(move[0], move[1], check_ok=False)
+            if board is None:
+                return None
+
+            board.reverse_perspective()
+
+        if board.is_game_over():
             return None
 
-        # Create agent for feature extraction
+        # Create agent for evaluation
         agent = PlayerAgent(board, lambda: 300.0)
 
-        # Extract features
-        features = extract_features(board, agent)
+        # Extract features (inline implementation)
+        features = np.zeros(128, dtype=np.float32)
+        my_loc = board.chicken_player.get_location()
+        enemy_loc = board.chicken_enemy.get_location()
+        map_size = 8
 
-        # Get ground truth from deep search
-        score = evaluate_with_search(board, depth)
+        # Basic features
+        features[0] = my_loc[0] / map_size
+        features[1] = my_loc[1] / map_size
+        features[2] = enemy_loc[0] / map_size
+        features[3] = enemy_loc[1] / map_size
+
+        # Egg counts
+        my_eggs = board.chicken_player.get_eggs_laid()
+        enemy_eggs = board.chicken_enemy.get_eggs_laid()
+        features[8] = my_eggs / 40.0
+        features[9] = enemy_eggs / 40.0
+        features[10] = (my_eggs - enemy_eggs) / 40.0
+
+        # Turd counts
+        my_turds = board.chicken_player.get_turds_left()
+        enemy_turds = board.chicken_enemy.get_turds_left()
+        features[12] = my_turds / 5.0
+        features[13] = enemy_turds / 5.0
+
+        # Mobility
+        my_moves = len(board.get_valid_moves())
+        board.reverse_perspective()
+        enemy_moves = len(board.get_valid_moves())
+        board.reverse_perspective()
+        features[32] = my_moves / 8.0
+        features[33] = enemy_moves / 8.0
+
+        # Turn information
+        features[36] = board.turn_count / 80.0
+        features[37] = board.turns_left_player / 40.0
+
+        # Center distance
+        center = map_size / 2.0
+        my_center_dist = (abs(my_loc[0] - center) + abs(my_loc[1] - center)) / map_size
+        enemy_center_dist = (abs(enemy_loc[0] - center) + abs(enemy_loc[1] - center)) / map_size
+        features[40] = my_center_dist
+        features[41] = enemy_center_dist
+
+        # Evaluate with deep search (inline implementation)
+        score, _ = agent.search_engine._minimax(
+            board=board,
+            depth=depth,
+            alpha=float('-inf'),
+            beta=float('inf'),
+            maximizing=True,
+            time_left=30.0,
+            trapdoor_tracker=agent.trapdoor_tracker
+        )
+        normalized_score = np.tanh(score / 1000.0)
 
         return {
             'features': features.tolist(),
-            'score': float(score),
+            'score': float(normalized_score),
             'metadata': {
                 'turn': board.turn_count,
-                'eggs_diff': board.chicken_player.get_eggs_laid() - board.chicken_enemy.get_eggs_laid(),
+                'eggs_diff': my_eggs - enemy_eggs,
                 'worker_id': worker_id
             }
         }
 
     except Exception as e:
-        print(f"Error in worker {worker_id}: {e}")
+        # Print detailed error for debugging
         import traceback
-        traceback.print_exc()
+        error_msg = f"Worker {worker_id} error on position {position_id}: {e}\n{traceback.format_exc()}"
+        print(error_msg, flush=True)
         return None
 
 
@@ -293,19 +376,27 @@ def generate_dataset(config, output_file='training_data.json'):
     print(f"{'='*60}\n")
 
     # Calculate statistics
-    scores = [d['score'] for d in dataset]
-    print(f"Dataset Statistics:")
-    print(f"  Score mean: {np.mean(scores):.3f}")
-    print(f"  Score std: {np.std(scores):.3f}")
-    print(f"  Score range: [{np.min(scores):.3f}, {np.max(scores):.3f}]")
-    print()
+    if len(dataset) > 0:
+        scores = [d['score'] for d in dataset]
+        print(f"Dataset Statistics:")
+        print(f"  Score mean: {np.mean(scores):.3f}")
+        print(f"  Score std: {np.std(scores):.3f}")
+        print(f"  Score range: [{np.min(scores):.3f}, {np.max(scores):.3f}]")
+        print()
 
-    # Save
-    print(f"Saving to {output_file}...")
-    with open(output_file, 'w') as f:
-        json.dump(dataset, f)
+        # Save
+        print(f"Saving to {output_file}...")
+        with open(output_file, 'w') as f:
+            json.dump(dataset, f)
 
-    print(f"✓ Dataset saved!")
+        print(f"✓ Dataset saved!")
+    else:
+        print("\n⚠ WARNING: No valid positions were generated!")
+        print("Check the error messages above to see what went wrong.")
+        print("Common issues:")
+        print("  - Import errors (check sys.path setup)")
+        print("  - Game logic errors (check Board implementation)")
+        print("  - Search timeout errors (check minimax implementation)")
 
     return dataset
 
