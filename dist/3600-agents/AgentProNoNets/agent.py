@@ -48,6 +48,7 @@ class PlayerAgent:
         self.visited_squares: set = set()  # Track all visited squares for exploration
         self.last_location: Optional[Tuple[int, int]] = None  # Track last location to detect trapdoors
         self.last_move_target: Optional[Tuple[int, int]] = None  # Track where we tried to move
+        self.blocked_locations: set = set()  # Track enemy eggs/barriers that block movement
         self.turn_count = 0
 
         print(f"✓ AgentB initialized (search_depth={self.search_engine.max_depth})")
@@ -80,12 +81,35 @@ class PlayerAgent:
                 self.trapdoor_tracker.mark_trapdoor_found(self.last_move_target)
                 print(f"🚨 TRAPDOOR DETECTED at {self.last_move_target} (location reset to spawn)")
                 self.visited_squares.add(self.last_move_target)  # Mark as visited
+            elif location != self.last_move_target and location == self.last_location:
+                # We tried to move but didn't move - likely hit an enemy egg/barrier!
+                # Only mark as blocked if it's not already a known trapdoor
+                if self.last_move_target not in self.trapdoor_tracker.known_trapdoors:
+                    self.blocked_locations.add(self.last_move_target)
+                    print(f"🚫 BLOCKED LOCATION DETECTED at {self.last_move_target} (enemy egg/barrier)")
         
         # Check if board has found_trapdoors attribute (from game engine)
         if hasattr(board, 'found_trapdoors'):
             for trapdoor_loc in board.found_trapdoors:
                 self.trapdoor_tracker.mark_trapdoor_found(trapdoor_loc)
                 self.visited_squares.add(trapdoor_loc)
+        
+        # Update blocked locations from current board state (enemy eggs and turd zones)
+        # This catches enemy eggs/turds that were placed between our turns
+        if hasattr(board, 'eggs_enemy'):
+            for egg_loc in board.eggs_enemy:
+                self.blocked_locations.add(egg_loc)
+        
+        # Check enemy turd zones (turds block the square and adjacent squares)
+        if hasattr(board, 'turds_enemy'):
+            for turd_loc in board.turds_enemy:
+                # Turd blocks its own square
+                self.blocked_locations.add(turd_loc)
+                # Turd also blocks adjacent squares
+                for direction in [Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT]:
+                    adjacent = loc_after_direction(turd_loc, direction)
+                    if board.is_valid_cell(adjacent):
+                        self.blocked_locations.add(adjacent)
         
         # Mark current location as visited
         self.visited_squares.add(location)
@@ -126,7 +150,7 @@ class PlayerAgent:
             print("⚠ WARNING: No valid moves available!")
             return (Direction.UP, MoveType.PLAIN)
 
-        # FILTER OUT moves to known trapdoors - never go there!
+        # FILTER OUT moves to known trapdoors and blocked locations - never go there!
         safe_moves = []
         for move in valid_moves:
             direction, move_type = move
@@ -135,6 +159,17 @@ class PlayerAgent:
             # Skip known trapdoors entirely
             if target_loc in self.trapdoor_tracker.known_trapdoors:
                 print(f"⚠ Filtered out move to known trapdoor at {target_loc}")
+                continue
+            
+            # Skip blocked locations (enemy eggs/barriers)
+            if target_loc in self.blocked_locations:
+                print(f"⚠ Filtered out move to blocked location at {target_loc} (enemy egg/barrier)")
+                continue
+            
+            # Also check if board says it's blocked (in case enemy just placed something)
+            if board.is_cell_blocked(target_loc):
+                self.blocked_locations.add(target_loc)
+                print(f"⚠ Filtered out move to blocked location at {target_loc} (board reports blocked)")
                 continue
             
             # Skip moves with very high trapdoor probability (>30%)
@@ -174,6 +209,10 @@ class PlayerAgent:
     def get_recent_positions(self) -> List[Tuple[int, int]]:
         """Get recent positions to avoid repetition"""
         return self.recent_positions
+    
+    def get_blocked_locations(self) -> set:
+        """Get the set of blocked locations (enemy eggs/barriers)"""
+        return self.blocked_locations
 
     def _evaluate_trapping_moves(
         self,
@@ -205,7 +244,7 @@ class PlayerAgent:
                 score = self.move_evaluator.evaluate_position(forecast)
                 forecast.reverse_perspective()
                 
-                # Penalize trapdoors and visited squares
+                # Penalize trapdoors, blocked locations, and visited squares
                 direction, move_type = move
                 new_loc = loc_after_direction(board.chicken_player.get_location(), direction)
                 
@@ -218,6 +257,10 @@ class PlayerAgent:
                         score -= danger * 100000.0  # Very heavy penalty
                     else:
                         score -= danger * 50000.0  # Heavy penalty
+                
+                # Massive penalty for blocked locations (enemy eggs/barriers)
+                if new_loc in self.blocked_locations:
+                    score -= 50000.0  # Very strong penalty - don't waste turns hitting barriers
                 
                 # Strong penalties for revisiting
                 if new_loc in self.visited_squares:
@@ -239,6 +282,17 @@ class PlayerAgent:
             # Double-check: never return a move to a known trapdoor
             if new_loc in self.trapdoor_tracker.known_trapdoors:
                 print(f"⚠ Rejected trapping move to known trapdoor at {new_loc}")
+                return None
+            
+            # Double-check: never return a move to a blocked location
+            if new_loc in self.blocked_locations:
+                print(f"⚠ Rejected trapping move to blocked location at {new_loc}")
+                return None
+            
+            # Check if board says it's blocked
+            if board.is_cell_blocked(new_loc):
+                self.blocked_locations.add(new_loc)
+                print(f"⚠ Rejected trapping move to blocked location at {new_loc} (board reports blocked)")
                 return None
             
             # Check danger level
@@ -270,7 +324,8 @@ class PlayerAgent:
                 time_left=time_left,
                 trapdoor_tracker=self.trapdoor_tracker,
                 visited_squares=self.visited_squares,
-                recent_positions=self.recent_positions
+                recent_positions=self.recent_positions,
+                blocked_locations=self.blocked_locations
             )
 
             if best_move:
@@ -281,6 +336,17 @@ class PlayerAgent:
                 if new_loc in self.trapdoor_tracker.known_trapdoors:
                     print(f"⚠ Rejected minimax move to known trapdoor at {new_loc}")
                     # Fall back to fallback move
+                    return None
+                
+                # Final safety check: never return a move to a blocked location
+                if new_loc in self.blocked_locations:
+                    print(f"⚠ Rejected minimax move to blocked location at {new_loc}")
+                    return None
+                
+                # Check if board says it's blocked
+                if board.is_cell_blocked(new_loc):
+                    self.blocked_locations.add(new_loc)
+                    print(f"⚠ Rejected minimax move to blocked location at {new_loc} (board reports blocked)")
                     return None
                 
                 # Check danger level
@@ -316,7 +382,8 @@ class PlayerAgent:
                 self.move_evaluator.quick_evaluate_move(
                     m, board, self.trapdoor_tracker, 
                     visited_squares=self.visited_squares,
-                    recent_positions=self.recent_positions
+                    recent_positions=self.recent_positions,
+                    blocked_locations=self.blocked_locations
                 ),
                 m
             )
@@ -325,7 +392,7 @@ class PlayerAgent:
 
         move_scores.sort(reverse=True, key=lambda x: x[0])
         
-        # Find the best move that's not to a known trapdoor
+        # Find the best move that's not to a known trapdoor or blocked location
         best_move = None
         for score, move in move_scores:
             direction, move_type = move
@@ -333,6 +400,15 @@ class PlayerAgent:
             
             # Skip known trapdoors
             if new_loc in self.trapdoor_tracker.known_trapdoors:
+                continue
+            
+            # Skip blocked locations
+            if new_loc in self.blocked_locations:
+                continue
+            
+            # Check if board says it's blocked
+            if board.is_cell_blocked(new_loc):
+                self.blocked_locations.add(new_loc)
                 continue
             
             # Skip high-risk locations

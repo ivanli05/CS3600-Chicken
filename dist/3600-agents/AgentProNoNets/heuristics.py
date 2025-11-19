@@ -23,7 +23,8 @@ class MoveEvaluator:
         board: board_module.Board,
         trapdoor_tracker=None,
         visited_squares=None,
-        recent_positions=None
+        recent_positions=None,
+        blocked_locations=None
     ) -> float:
         """
         Quick heuristic evaluation of a move for move ordering.
@@ -36,14 +37,23 @@ class MoveEvaluator:
         enemy_loc = board.chicken_enemy.get_location()
 
         score = 0.0
+        
+        # 0.5. MASSIVE penalty for blocked locations (enemy eggs/barriers)
+        # This prevents wasting turns by repeatedly hitting the same barrier
+        if blocked_locations is not None and new_loc in blocked_locations:
+            score -= 50000.0  # Extremely strong penalty - never waste a turn on a known barrier
+        
+        # Also check if board says it's blocked (catches newly placed enemy eggs/turds)
+        if board.is_cell_blocked(new_loc):
+            score -= 50000.0  # Same penalty for currently blocked locations
 
-        # 1. Egg moves are highly valuable (direct scoring)
+        # 1. Egg moves are HIGHLY valuable (direct scoring) - EMPHASIZED!
         if move_type == MoveType.EGG:
-            score += 100.0
+            score += 300.0  # INCREASED from 100.0 - much stronger emphasis on egg laying!
             
             # Bonus for laying eggs in new/unexplored areas - encourages spreading eggs
             if visited_squares is None or new_loc not in visited_squares:
-                score += 80.0  # Large bonus for eggs in new areas
+                score += 150.0  # INCREASED from 80.0 - stronger bonus for eggs in new areas
             
             # Bonus for laying eggs far from existing eggs (spread out, don't cluster)
             if hasattr(board, 'eggs_player') and board.eggs_player:
@@ -53,9 +63,9 @@ class MoveEvaluator:
                 )
                 # Bonus for spreading eggs out (farther from existing eggs = better)
                 if min_dist_to_existing_egg >= 4:
-                    score += 40.0  # Good spread
+                    score += 60.0  # INCREASED from 40.0 - better spread bonus
                 elif min_dist_to_existing_egg >= 3:
-                    score += 20.0  # Decent spread
+                    score += 30.0  # INCREASED from 20.0
                 elif min_dist_to_existing_egg <= 1:
                     score -= 30.0  # Penalty for clustering too close
             
@@ -65,21 +75,25 @@ class MoveEvaluator:
                 # Check if this chicken can lay eggs on this corner
                 can_lay_on_corner = board.chicken_player.can_lay_egg(new_loc)
                 if can_lay_on_corner:
-                    score += 200.0  # Massive bonus for accessible corner eggs (3x value!)
+                    score += 500.0  # INCREASED from 200.0 - even more massive bonus for corner eggs!
                 else:
-                    score += 10.0  # Small bonus even if can't lay (still valuable position)
+                    score += 20.0  # INCREASED from 10.0
             # Center eggs control the board
             if self._is_center(new_loc):
-                score += 30.0
+                score += 50.0  # INCREASED from 30.0
 
         # 1.5. Plain moves that help exploration are valuable
         # Plain moves are necessary to reach new egg-laying locations
+        # BUT: prioritize egg moves over plain moves when possible
         if move_type == MoveType.PLAIN:
             # Bonus for plain moves to new squares (helps exploration)
             if visited_squares is None or new_loc not in visited_squares:
                 score += 40.0  # Good bonus for exploring via plain moves
             # Small bonus for plain moves that get us closer to unexplored areas
             # (This encourages movement even when not laying eggs)
+            
+            # However, plain moves should be less valuable than egg moves
+            # This is already the case since egg moves get +300 base score
 
         # 2. Turd moves for strategic blocking
         elif move_type == MoveType.TURD:
@@ -96,7 +110,7 @@ class MoveEvaluator:
                     score += 40.0
 
         # 3. Avoid trapdoors! (CRITICAL - costs 4 eggs = 400 points!)
-        # Egg moves give +100, so trapdoor penalty must be MUCH higher
+        # Egg moves give +300, so trapdoor penalty must be MUCH higher
         if trapdoor_tracker:
             danger = trapdoor_tracker.get_danger_score(new_loc)
             # Check if this is a known trapdoor
@@ -120,6 +134,33 @@ class MoveEvaluator:
                     score -= danger * 20000.0  # Significant penalty
                 else:
                     score -= danger * 10000.0  # Still meaningful penalty
+            
+            # 3.5. AVOID STAYING AROUND KNOWN TRAPDOORS - explore outwards!
+            # Once we know where trapdoors are, move away from them
+            if trapdoor_tracker.known_trapdoors:
+                min_dist_to_trapdoor = min(
+                    abs(new_loc[0] - trap[0]) + abs(new_loc[1] - trap[1])
+                    for trap in trapdoor_tracker.known_trapdoors
+                )
+                
+                # STRONG penalty for being near known trapdoors (within 2 squares)
+                # This encourages moving away from trapdoor areas
+                if min_dist_to_trapdoor <= 1:
+                    score -= 2000.0  # Very strong penalty - don't stay adjacent to trapdoors!
+                elif min_dist_to_trapdoor <= 2:
+                    score -= 800.0  # Strong penalty - avoid staying close to trapdoors
+                elif min_dist_to_trapdoor <= 3:
+                    score -= 300.0  # Moderate penalty
+                
+                # BONUS for moving far away from known trapdoors (encourages exploration)
+                if min_dist_to_trapdoor >= 5:
+                    score += 200.0  # Good bonus for getting far from trapdoors
+                elif min_dist_to_trapdoor >= 4:
+                    score += 100.0  # Decent bonus
+                
+                # EXTRA exploration bonus when moving away from trapdoors to new areas
+                if min_dist_to_trapdoor >= 3 and (visited_squares is None or new_loc not in visited_squares):
+                    score += 150.0  # Strong bonus for exploring new areas away from trapdoors
 
         # 4. Positional factors
         # Moving toward center is good (more options)

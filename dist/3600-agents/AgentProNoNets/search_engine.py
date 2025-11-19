@@ -36,7 +36,8 @@ class SearchEngine:
         time_left: Callable,
         trapdoor_tracker=None,
         visited_squares=None,
-        recent_positions=None
+        recent_positions=None,
+        blocked_locations=None
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """
         Main search entry point.
@@ -56,7 +57,8 @@ class SearchEngine:
             time_left=search_time,
             trapdoor_tracker=trapdoor_tracker,
             visited_squares=visited_squares,
-            recent_positions=recent_positions
+            recent_positions=recent_positions,
+            blocked_locations=blocked_locations
         )
 
         return score, best_move
@@ -71,7 +73,8 @@ class SearchEngine:
         time_left: float,
         trapdoor_tracker=None,
         visited_squares=None,
-        recent_positions=None
+        recent_positions=None,
+        blocked_locations=None
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """
         Minimax algorithm with alpha-beta pruning.
@@ -103,18 +106,18 @@ class SearchEngine:
 
         # Order moves for better pruning
         ordered_moves = self._order_moves(
-            valid_moves, board, depth, trapdoor_tracker, visited_squares, recent_positions
+            valid_moves, board, depth, trapdoor_tracker, visited_squares, recent_positions, blocked_locations
         )
 
         if maximizing:
             return self._maximize(
                 board, ordered_moves, depth, alpha, beta,
-                time_left, trapdoor_tracker, visited_squares, recent_positions
+                time_left, trapdoor_tracker, visited_squares, recent_positions, blocked_locations
             )
         else:
             return self._minimize(
                 board, ordered_moves, depth, alpha, beta,
-                time_left, trapdoor_tracker, visited_squares, recent_positions
+                time_left, trapdoor_tracker, visited_squares, recent_positions, blocked_locations
             )
 
     def _maximize(
@@ -127,7 +130,8 @@ class SearchEngine:
         time_left: float,
         trapdoor_tracker=None,
         visited_squares=None,
-        recent_positions=None
+        recent_positions=None,
+        blocked_locations=None
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """Maximizing player's turn"""
         max_score = float('-inf')
@@ -147,7 +151,7 @@ class SearchEngine:
                 forecast.reverse_perspective()
                 score, _ = self._minimax(
                     forecast, depth - 1, alpha, beta, False,
-                    time_left - 0.01, trapdoor_tracker, visited_squares, recent_positions
+                    time_left - 0.01, trapdoor_tracker, visited_squares, recent_positions, blocked_locations
                 )
                 forecast.reverse_perspective()
 
@@ -178,7 +182,8 @@ class SearchEngine:
         time_left: float,
         trapdoor_tracker=None,
         visited_squares=None,
-        recent_positions=None
+        recent_positions=None,
+        blocked_locations=None
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """Minimizing player's turn"""
         min_score = float('inf')
@@ -196,7 +201,7 @@ class SearchEngine:
                 forecast.reverse_perspective()
                 score, _ = self._minimax(
                     forecast, depth - 1, alpha, beta, True,
-                    time_left - 0.01, trapdoor_tracker, visited_squares, recent_positions
+                    time_left - 0.01, trapdoor_tracker, visited_squares, recent_positions, blocked_locations
                 )
                 forecast.reverse_perspective()
 
@@ -221,7 +226,8 @@ class SearchEngine:
         depth: int,
         trapdoor_tracker=None,
         visited_squares=None,
-        recent_positions=None
+        recent_positions=None,
+        blocked_locations=None
     ) -> List[Tuple[Direction, MoveType]]:
         """
         Order moves for better alpha-beta pruning efficiency.
@@ -240,15 +246,15 @@ class SearchEngine:
             # 2. History heuristic (historically good moves)
             score += self.history_table.get(move, 0) * 10.0
 
-            # 3. Move type priority: Egg > Turd > Plain
+            # 3. Move type priority: Egg > Turd > Plain (EMPHASIZED!)
             if move[1] == MoveType.EGG:
-                score += 1000.0
+                score += 3000.0  # INCREASED from 1000.0 - much stronger priority for egg moves!
             elif move[1] == MoveType.TURD:
                 score += 500.0
 
             # 4. Positional evaluation
             score += self.evaluator.quick_evaluate_move(
-                move, board, trapdoor_tracker, visited_squares, recent_positions
+                move, board, trapdoor_tracker, visited_squares, recent_positions, blocked_locations
             )
 
             move_scores.append((score, move))
