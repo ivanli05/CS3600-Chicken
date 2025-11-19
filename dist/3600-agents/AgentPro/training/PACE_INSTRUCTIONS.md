@@ -130,6 +130,13 @@ sbatch generate_data_job.sbatch
 # Submitted batch job 12345678
 ```
 
+**About Multiprocessing on PACE:**
+- ✅ PACE fully supports Python multiprocessing via `--cpus-per-task`
+- The sbatch file requests 32 CPUs which will be allocated to your job
+- Python's `multiprocessing.Pool` will use these CPUs to run workers in parallel
+- The `--num-workers` argument will be set to match `$SLURM_CPUS_PER_TASK` (32)
+- Each worker processes positions independently, speeding up data generation ~30x
+
 **Monitor the data generation:**
 
 ```bash

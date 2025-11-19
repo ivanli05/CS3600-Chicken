@@ -196,6 +196,7 @@ def generate_single_position(args):
 
     # Now import modules (must be after path setup)
     from game.board import Board
+    from game.game_map import GameMap
     from game.enums import MoveType
     from AgentPro.agent import PlayerAgent
     import numpy as np
@@ -205,7 +206,8 @@ def generate_single_position(args):
 
     try:
         # Generate random position (inline implementation)
-        board = Board()
+        game_map = GameMap()
+        board = Board(game_map)
         num_moves = random.randint(min_moves, max_moves)
 
         for _ in range(num_moves):
