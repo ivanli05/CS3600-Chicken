@@ -34,7 +34,9 @@ class SearchEngine:
         self,
         board: board_module.Board,
         time_left: Callable,
-        trapdoor_tracker=None
+        trapdoor_tracker=None,
+        visited_squares=None,
+        recent_positions=None
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """
         Main search entry point.
@@ -52,7 +54,9 @@ class SearchEngine:
             beta=float('inf'),
             maximizing=True,
             time_left=search_time,
-            trapdoor_tracker=trapdoor_tracker
+            trapdoor_tracker=trapdoor_tracker,
+            visited_squares=visited_squares,
+            recent_positions=recent_positions
         )
 
         return score, best_move
@@ -65,7 +69,9 @@ class SearchEngine:
         beta: float,
         maximizing: bool,
         time_left: float,
-        trapdoor_tracker=None
+        trapdoor_tracker=None,
+        visited_squares=None,
+        recent_positions=None
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """
         Minimax algorithm with alpha-beta pruning.
@@ -97,18 +103,18 @@ class SearchEngine:
 
         # Order moves for better pruning
         ordered_moves = self._order_moves(
-            valid_moves, board, depth, trapdoor_tracker
+            valid_moves, board, depth, trapdoor_tracker, visited_squares, recent_positions
         )
 
         if maximizing:
             return self._maximize(
                 board, ordered_moves, depth, alpha, beta,
-                time_left, trapdoor_tracker
+                time_left, trapdoor_tracker, visited_squares, recent_positions
             )
         else:
             return self._minimize(
                 board, ordered_moves, depth, alpha, beta,
-                time_left, trapdoor_tracker
+                time_left, trapdoor_tracker, visited_squares, recent_positions
             )
 
     def _maximize(
@@ -119,7 +125,9 @@ class SearchEngine:
         alpha: float,
         beta: float,
         time_left: float,
-        trapdoor_tracker=None
+        trapdoor_tracker=None,
+        visited_squares=None,
+        recent_positions=None
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """Maximizing player's turn"""
         max_score = float('-inf')
@@ -139,7 +147,7 @@ class SearchEngine:
                 forecast.reverse_perspective()
                 score, _ = self._minimax(
                     forecast, depth - 1, alpha, beta, False,
-                    time_left - 0.01, trapdoor_tracker
+                    time_left - 0.01, trapdoor_tracker, visited_squares, recent_positions
                 )
                 forecast.reverse_perspective()
 
@@ -168,7 +176,9 @@ class SearchEngine:
         alpha: float,
         beta: float,
         time_left: float,
-        trapdoor_tracker=None
+        trapdoor_tracker=None,
+        visited_squares=None,
+        recent_positions=None
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """Minimizing player's turn"""
         min_score = float('inf')
@@ -186,7 +196,7 @@ class SearchEngine:
                 forecast.reverse_perspective()
                 score, _ = self._minimax(
                     forecast, depth - 1, alpha, beta, True,
-                    time_left - 0.01, trapdoor_tracker
+                    time_left - 0.01, trapdoor_tracker, visited_squares, recent_positions
                 )
                 forecast.reverse_perspective()
 
@@ -209,7 +219,9 @@ class SearchEngine:
         moves: List[Tuple[Direction, MoveType]],
         board: board_module.Board,
         depth: int,
-        trapdoor_tracker=None
+        trapdoor_tracker=None,
+        visited_squares=None,
+        recent_positions=None
     ) -> List[Tuple[Direction, MoveType]]:
         """
         Order moves for better alpha-beta pruning efficiency.
@@ -236,7 +248,7 @@ class SearchEngine:
 
             # 4. Positional evaluation
             score += self.evaluator.quick_evaluate_move(
-                move, board, trapdoor_tracker
+                move, board, trapdoor_tracker, visited_squares, recent_positions
             )
 
             move_scores.append((score, move))

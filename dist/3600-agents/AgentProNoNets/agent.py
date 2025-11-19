@@ -44,6 +44,10 @@ class PlayerAgent:
 
         # Game state tracking
         self.position_history: List[Tuple[int, int]] = []
+        self.recent_positions: List[Tuple[int, int]] = []  # Track recent positions (last 8 moves) to avoid repetition
+        self.visited_squares: set = set()  # Track all visited squares for exploration
+        self.last_location: Optional[Tuple[int, int]] = None  # Track last location to detect trapdoors
+        self.last_move_target: Optional[Tuple[int, int]] = None  # Track where we tried to move
         self.turn_count = 0
 
         print(f"✓ AgentB initialized (search_depth={self.search_engine.max_depth})")
@@ -67,6 +71,26 @@ class PlayerAgent:
         self.turn_count += 1
         location = board.chicken_player.get_location()
 
+        # Detect if we stepped on a trapdoor (location was reset unexpectedly)
+        # If we tried to move to a location but ended up at spawn, we hit a trapdoor
+        if self.last_move_target is not None:
+            spawn_location = board.chicken_player.get_spawn()
+            if location == spawn_location and location != self.last_location:
+                # We were reset to spawn - the last move target was a trapdoor!
+                self.trapdoor_tracker.mark_trapdoor_found(self.last_move_target)
+                print(f"🚨 TRAPDOOR DETECTED at {self.last_move_target} (location reset to spawn)")
+                self.visited_squares.add(self.last_move_target)  # Mark as visited
+        
+        # Check if board has found_trapdoors attribute (from game engine)
+        if hasattr(board, 'found_trapdoors'):
+            for trapdoor_loc in board.found_trapdoors:
+                self.trapdoor_tracker.mark_trapdoor_found(trapdoor_loc)
+                self.visited_squares.add(trapdoor_loc)
+        
+        # Mark current location as visited
+        self.visited_squares.add(location)
+        self.last_location = location
+
         # Print turn information
         self._print_turn_info(board, sensor_data, time_left)
 
@@ -77,11 +101,24 @@ class PlayerAgent:
 
         # Update trapdoor beliefs based on sensor data
         self.trapdoor_tracker.update_beliefs(location, sensor_data)
+        
+        # Check if current location should be marked as a known trapdoor
+        # (if we have very high confidence and we're on it, or if we detected it)
+        danger = self.trapdoor_tracker.get_danger_score(location)
+        if danger > 0.8:  # Very high probability
+            # Mark as known trapdoor to avoid it in future
+            self.trapdoor_tracker.mark_trapdoor_found(location)
+            print(f"⚠ Marked trapdoor at {location} (high probability: {danger:.1%})")
 
         # Track position history
         self.position_history.append(location)
         if len(self.position_history) > 20:
             self.position_history.pop(0)
+        
+        # Track recent positions to avoid repetition (last 8 moves)
+        self.recent_positions.append(location)
+        if len(self.recent_positions) > 8:
+            self.recent_positions.pop(0)
 
         # Get valid moves
         valid_moves = board.get_valid_moves()
@@ -89,7 +126,32 @@ class PlayerAgent:
             print("⚠ WARNING: No valid moves available!")
             return (Direction.UP, MoveType.PLAIN)
 
-        print(f"Valid moves: {len(valid_moves)}")
+        # FILTER OUT moves to known trapdoors - never go there!
+        safe_moves = []
+        for move in valid_moves:
+            direction, move_type = move
+            target_loc = loc_after_direction(location, direction)
+            
+            # Skip known trapdoors entirely
+            if target_loc in self.trapdoor_tracker.known_trapdoors:
+                print(f"⚠ Filtered out move to known trapdoor at {target_loc}")
+                continue
+            
+            # Skip moves with very high trapdoor probability (>30%)
+            danger = self.trapdoor_tracker.get_danger_score(target_loc)
+            if danger > 0.3:
+                print(f"⚠ Filtered out move to high-risk location {target_loc} (danger: {danger:.1%})")
+                continue
+            
+            safe_moves.append(move)
+        
+        # If we filtered out all moves, use original moves but with heavy penalties
+        if not safe_moves:
+            print("⚠ WARNING: All moves filtered! Using original moves with heavy penalties...")
+            safe_moves = valid_moves
+        else:
+            valid_moves = safe_moves
+            print(f"Valid safe moves: {len(valid_moves)} (filtered {len(board.get_valid_moves()) - len(valid_moves)} trapdoor moves)")
 
         # Strategy 1: Look for high-value trapping moves
         trapping_move = self._evaluate_trapping_moves(board)
@@ -104,6 +166,14 @@ class PlayerAgent:
         # Fallback: Use heuristic evaluation only
         print("[FALLBACK] Using heuristic evaluation...")
         return self._fallback_move(board, valid_moves)
+    
+    def get_visited_squares(self) -> set:
+        """Get the set of visited squares for exploration penalty"""
+        return self.visited_squares
+    
+    def get_recent_positions(self) -> List[Tuple[int, int]]:
+        """Get recent positions to avoid repetition"""
+        return self.recent_positions
 
     def _evaluate_trapping_moves(
         self,
@@ -134,6 +204,26 @@ class PlayerAgent:
                 forecast.reverse_perspective()
                 score = self.move_evaluator.evaluate_position(forecast)
                 forecast.reverse_perspective()
+                
+                # Penalize trapdoors and visited squares
+                direction, move_type = move
+                new_loc = loc_after_direction(board.chicken_player.get_location(), direction)
+                
+                # Massive penalty for known trapdoors
+                if new_loc in self.trapdoor_tracker.known_trapdoors:
+                    score -= 1000000.0  # Absolutely never go there
+                else:
+                    danger = self.trapdoor_tracker.get_danger_score(new_loc)
+                    if danger > 0.1:
+                        score -= danger * 100000.0  # Very heavy penalty
+                    else:
+                        score -= danger * 50000.0  # Heavy penalty
+                
+                # Strong penalties for revisiting
+                if new_loc in self.visited_squares:
+                    score -= 400.0  # Increased penalty for revisiting any visited square
+                if new_loc in self.recent_positions:
+                    score -= 600.0  # Even stronger penalty for recently visited squares
 
                 if score > best_trap_score:
                     best_trap_score = score
@@ -145,8 +235,21 @@ class PlayerAgent:
         if best_trap_move:
             direction, move_type = best_trap_move
             new_loc = loc_after_direction(board.chicken_player.get_location(), direction)
+            
+            # Double-check: never return a move to a known trapdoor
+            if new_loc in self.trapdoor_tracker.known_trapdoors:
+                print(f"⚠ Rejected trapping move to known trapdoor at {new_loc}")
+                return None
+            
+            # Check danger level
+            danger = self.trapdoor_tracker.get_danger_score(new_loc)
+            if danger > 0.3:
+                print(f"⚠ Rejected trapping move to high-risk location {new_loc} (danger: {danger:.1%})")
+                return None
+            
             print(f"[TRAP] Selected: {Direction(direction).name} + {MoveType(move_type).name} → {new_loc}")
             print(f"       Score: {best_trap_score:.1f}")
+            self.last_move_target = new_loc
             return best_trap_move
 
         return None
@@ -165,19 +268,34 @@ class PlayerAgent:
             score, best_move = self.search_engine.search(
                 board=board,
                 time_left=time_left,
-                trapdoor_tracker=self.trapdoor_tracker
+                trapdoor_tracker=self.trapdoor_tracker,
+                visited_squares=self.visited_squares,
+                recent_positions=self.recent_positions
             )
 
             if best_move:
                 direction, move_type = best_move
                 new_loc = loc_after_direction(board.chicken_player.get_location(), direction)
+                
+                # Final safety check: never return a move to a known trapdoor
+                if new_loc in self.trapdoor_tracker.known_trapdoors:
+                    print(f"⚠ Rejected minimax move to known trapdoor at {new_loc}")
+                    # Fall back to fallback move
+                    return None
+                
+                # Check danger level
+                danger = self.trapdoor_tracker.get_danger_score(new_loc)
+                if danger > 0.3:
+                    print(f"⚠ Rejected minimax move to high-risk location {new_loc} (danger: {danger:.1%})")
+                    return None
 
                 print(f"[MOVE] Minimax chose: {Direction(direction).name} + {MoveType(move_type).name} → {new_loc}")
                 print(f"       Evaluation: {score:.1f}")
 
                 # Update history for move ordering
                 self.search_engine.record_best_move(best_move, self.search_engine.max_depth)
-
+                
+                self.last_move_target = new_loc
                 return best_move
 
         except Exception as e:
@@ -196,7 +314,9 @@ class PlayerAgent:
         move_scores = [
             (
                 self.move_evaluator.quick_evaluate_move(
-                    m, board, self.trapdoor_tracker
+                    m, board, self.trapdoor_tracker, 
+                    visited_squares=self.visited_squares,
+                    recent_positions=self.recent_positions
                 ),
                 m
             )
@@ -204,14 +324,38 @@ class PlayerAgent:
         ]
 
         move_scores.sort(reverse=True, key=lambda x: x[0])
-        best_score, best_move = move_scores[0]
+        
+        # Find the best move that's not to a known trapdoor
+        best_move = None
+        for score, move in move_scores:
+            direction, move_type = move
+            new_loc = loc_after_direction(board.chicken_player.get_location(), direction)
+            
+            # Skip known trapdoors
+            if new_loc in self.trapdoor_tracker.known_trapdoors:
+                continue
+            
+            # Skip high-risk locations
+            danger = self.trapdoor_tracker.get_danger_score(new_loc)
+            if danger > 0.3:
+                continue
+            
+            best_move = move
+            best_score = score
+            break
+        
+        # If all moves were filtered, use the best one anyway (shouldn't happen due to earlier filtering)
+        if best_move is None and move_scores:
+            best_score, best_move = move_scores[0]
+            print("⚠ WARNING: All fallback moves filtered, using best available (risky!)")
 
         direction, move_type = best_move
         new_loc = loc_after_direction(board.chicken_player.get_location(), direction)
 
         print(f"[MOVE] Heuristic chose: {Direction(direction).name} + {MoveType(move_type).name} → {new_loc}")
         print(f"       Score: {best_score:.1f}")
-
+        
+        self.last_move_target = new_loc
         return best_move
 
     def _print_turn_info(
