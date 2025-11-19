@@ -1,15 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=agentb_datagen    # Job name
-#SBATCH --output=logs/datagen_%j.out # Output log
-#SBATCH --error=logs/datagen_%j.err  # Error log
-#SBATCH --time=03:00:00              # 3-hour time limit
-#SBATCH --partition=cpu              # CPU partition (no GPU needed)
-#SBATCH --cpus-per-task=32           # Use many cores for parallel generation
-#SBATCH --mem=32G                    # Memory
-#SBATCH --ntasks=1                   # Single task
+#SBATCH --job-name=AgentPro_DataGen        # Job name
+#SBATCH -N1 --ntasks-per-node=1            # Number of nodes and cores per node required
+#SBATCH --cpus-per-task=32                 # Use many cores for parallel generation
+#SBATCH --mem=32G                          # Memory
+#SBATCH --time=3:00:00                     # Duration of the job (3 hours)
+#SBATCH -o logs/datagen-%j.out             # Output log
+#SBATCH --mail-type=BEGIN,END,FAIL         # Mail preferences
 
 # ============================================================================
-# AgentB Training Data Generation (Parallel)
+# AgentPro Training Data Generation (Parallel)
 # ============================================================================
 
 echo "=========================================="
@@ -23,13 +22,20 @@ echo "=========================================="
 mkdir -p logs
 
 # Load modules
-module purge
-module load python/3.11
+module load python/3.10
 
-# Activate environment
-# source ~/venvs/agentb/bin/activate
-# or
-# conda activate agentb
+# Create or activate virtual environment
+if [ ! -d "datagen_env" ]; then
+    echo "Creating virtual environment..."
+    python3.10 -m venv datagen_env
+    source datagen_env/bin/activate
+    echo "Installing dependencies..."
+    pip install -r ../../../requirements.txt
+    pip install pyyaml
+else
+    echo "Using existing virtual environment..."
+    source datagen_env/bin/activate
+fi
 
 # Set environment variables
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
@@ -44,7 +50,7 @@ echo "Starting parallel data generation..."
 echo ""
 
 # Run data generation with all available cores
-python generate_data_parallel.py \
+python -u generate_data_parallel.py \
     --config config.yaml \
     --output training_data.json \
     --num-workers $SLURM_CPUS_PER_TASK

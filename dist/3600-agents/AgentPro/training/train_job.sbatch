@@ -1,16 +1,15 @@
 #!/bin/bash
-#SBATCH --job-name=agentb_train      # Job name
-#SBATCH --output=logs/train_%j.out   # Output log (%j = job ID)
-#SBATCH --error=logs/train_%j.err    # Error log
-#SBATCH --time=06:00:00              # 6-hour time limit
-#SBATCH --partition=gpu              # GPU partition (adjust for your cluster)
-#SBATCH --gres=gpu:h100:1            # Request 1x H100 GPU
-#SBATCH --cpus-per-task=16           # CPU cores for data loading
-#SBATCH --mem=64G                    # Memory
-#SBATCH --ntasks=1                   # Single task
+#SBATCH --job-name=AgentPro_Training       # Job name
+#SBATCH -N1 --ntasks-per-node=1            # Number of nodes and cores per node required
+#SBATCH --gres=gpu:H100:1                  # GPU type (H100) and number of GPUs
+#SBATCH --mem-per-gpu=64GB                 # Memory per GPU
+#SBATCH --cpus-per-task=16                 # CPU cores for data loading
+#SBATCH --time=6:00:00                     # Duration of the job (6 hours)
+#SBATCH -o logs/train-%j.out               # Output log
+#SBATCH --mail-type=BEGIN,END,FAIL         # Mail preferences
 
 # ============================================================================
-# AgentB Training on H100 GPU
+# AgentPro Training on H100 GPU
 # ============================================================================
 
 echo "=========================================="
@@ -28,17 +27,21 @@ echo "GPU Information:"
 nvidia-smi
 echo ""
 
-# Load modules (adjust for your cluster)
-module purge
-module load cuda/12.1
-module load cudnn/8.9
-module load python/3.11
+# Load modules
+module load python/3.10
 
-# Activate virtual environment (if using one)
-# source ~/venvs/agentb/bin/activate
-
-# Or use conda
-# conda activate agentb
+# Create or activate virtual environment
+if [ ! -d "training_env" ]; then
+    echo "Creating virtual environment..."
+    python3.10 -m venv training_env
+    source training_env/bin/activate
+    echo "Installing dependencies..."
+    pip install -r ../../../requirements.txt
+    pip install pyyaml tensorboard matplotlib
+else
+    echo "Using existing virtual environment..."
+    source training_env/bin/activate
+fi
 
 # Set environment variables
 export CUDA_VISIBLE_DEVICES=0
@@ -61,7 +64,7 @@ echo "Starting training..."
 echo ""
 
 # Run training with time limit (5.5 hours to be safe)
-python train_on_gpu.py \
+python -u train_on_gpu.py \
     --config config.yaml \
     --max-hours 5.5
 
