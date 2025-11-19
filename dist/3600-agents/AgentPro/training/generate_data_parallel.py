@@ -197,6 +197,7 @@ def generate_single_position(args):
     # Now import modules (must be after path setup)
     from game.board import Board
     from game.game_map import GameMap
+    from game.trapdoor_manager import TrapdoorManager
     from game.enums import MoveType
     from AgentPro.agent import PlayerAgent
     import numpy as np
@@ -207,7 +208,13 @@ def generate_single_position(args):
     try:
         # Generate random position (inline implementation)
         game_map = GameMap()
+        trapdoor_manager = TrapdoorManager(game_map)
         board = Board(game_map)
+
+        # Initialize chicken starting positions
+        spawns = trapdoor_manager.choose_spawns()
+        board.chicken_player.start(spawns[0], 0)  # Player A (even chicken)
+        board.chicken_enemy.start(spawns[1], 1)   # Player B (odd chicken)
         num_moves = random.randint(min_moves, max_moves)
 
         for _ in range(num_moves):
