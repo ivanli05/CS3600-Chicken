@@ -1,10 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=AgentPro_Train_Ultimate
+#SBATCH --partition=coc-gpu             # Use COC GPU partition (adjust if needed)
 #SBATCH -N1 --ntasks-per-node=1
-#SBATCH --gres=gpu:H100:1               # 1 H100 GPU
+#SBATCH --gres=gpu:H100:1               # 1 H100 GPU (or gpu:1 for any GPU)
 #SBATCH --cpus-per-task=16              # CPU cores for data loading
 #SBATCH --mem=64GB                       # Memory for large model and data
-#SBATCH --time=12:00:00                 # 12 hours (400 epochs with 200k positions)
+#SBATCH --time=8:00:00                  # 8 hours (sufficient for 100k positions)
 #SBATCH -o logs/train_ultimate-%j.out
 #SBATCH --mail-type=BEGIN,END,FAIL
 
@@ -69,7 +70,7 @@ echo ""
 echo "Starting ULTIMATE model training..."
 echo "Configuration: config_ultimate.yaml"
 echo "  - Model: 512 hidden, 6 residual blocks"
-echo "  - Data: 200k positions (12% val, 8% test)"
+echo "  - Data: 200k positions (24k val, 16k test)"
 echo "  - Training: 400 epochs, batch 512, mixed precision"
 echo "  - Early stopping: patience 40"
 echo ""

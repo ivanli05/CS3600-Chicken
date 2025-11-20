@@ -177,10 +177,8 @@ def generate_position(args):
             }
         }
 
-    except Exception as e:
-        import traceback
-        print(f"Worker {worker_id} error on position {position_id}: {e}")
-        print(traceback.format_exc())
+    except Exception:
+        # Silently skip failed positions
         return None
 
 
@@ -204,8 +202,7 @@ def evaluate_position_deep(board, agent, depth=8):
 
         return score
 
-    except Exception as e:
-        print(f"Evaluation error: {e}")
+    except Exception:
         # Fallback: use simple material count
         my_eggs = board.chicken_player.get_eggs_laid()
         enemy_eggs = board.chicken_enemy.get_eggs_laid()
@@ -258,12 +255,12 @@ def main():
 
     # Configuration
     config = {
-        'num_positions': 200000,  # 200k positions for thorough training
-        'depth': 8,              # Deep search for accurate labels
+        'num_positions': 200000,  # 200k positions - use full 8hr window
+        'depth': 7,              # Depth 7 for higher quality labels
         'min_moves': 8,          # Skip very early positions
         'max_moves': 30,         # Don't go to endgame (boring)
         'move_variety': 'weighted',  # weighted, uniform, or smart
-        'num_processes': 16,     # Parallel workers (adjust for your machine)
+        'num_processes': 32,     # Match SBATCH CPU allocation
         'output_file': 'training_data_ultimate.json'
     }
 

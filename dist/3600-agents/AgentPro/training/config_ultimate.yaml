@@ -60,7 +60,7 @@ hardware:
 # Data generation (for reference)
 data_generation:
   num_positions: 200000
-  depth_for_labels: 8
+  depth_for_labels: 7
   num_processes: 32
   min_moves: 8
   max_moves: 30

@@ -92,13 +92,8 @@ if TORCH_AVAILABLE:
                     # Just model weights
                     self.load_state_dict(checkpoint)
 
-                print(f"✓ Loaded trained evaluator weights from {path}")
                 return True
-            except FileNotFoundError:
-                print(f"⚠ No trained weights found at {path}, using random initialization")
-                return False
-            except Exception as e:
-                print(f"⚠ Error loading weights: {e}")
+            except (FileNotFoundError, Exception):
                 return False
 else:
     class PositionEvaluator:
@@ -119,8 +114,6 @@ else:
             """Load numpy weights if available"""
             try:
                 self.weights = np.load(path)
-                print(f"✓ Loaded weights from {path}")
                 return True
             except:
-                print(f"⚠ No weights found, using random initialization")
                 return False

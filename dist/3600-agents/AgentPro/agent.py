@@ -62,11 +62,7 @@ class PlayerAgent:
                 if loaded:
                     self.nn_evaluator.eval()
                     self.use_nn_eval = True
-                    print("✓ Neural network loaded successfully")
-                else:
-                    print("⚠ Neural network weights not found - using heuristics only")
-            except Exception as e:
-                print(f"⚠ Neural network error: {e}")
+            except Exception:
                 self.nn_evaluator = None
 
         self.search_engine = SearchEngine(
@@ -83,9 +79,6 @@ class PlayerAgent:
         self.last_move_target: Optional[Tuple[int, int]] = None  # Track where we tried to move
         self.blocked_locations: set = set()  # Track enemy eggs/barriers that block movement
         self.turn_count = 0
-
-        nn_status = "with NN" if self.use_nn_eval else "heuristics only"
-        print(f"✓ AgentPro initialized (search_depth={self.search_engine.max_depth}, {nn_status})")
 
     def play(
         self,
