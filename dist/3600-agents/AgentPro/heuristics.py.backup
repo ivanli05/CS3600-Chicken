@@ -274,55 +274,17 @@ class MoveEvaluator:
     def evaluate_position(
         self,
         board: board_module.Board,
-        nn_evaluator=None,
-        feature_extractor=None,
-        trapdoor_tracker=None
+        nn_evaluator=None
     ) -> float:
         """
         Comprehensive position evaluation.
 
-        Uses neural network if available, otherwise falls back to heuristics.
         Returns a score where positive is good for current player.
         """
-        # Try neural network first (if available and loaded)
-        if nn_evaluator is not None and feature_extractor is not None:
-            try:
-                import torch
-
-                # Extract features
-                features = feature_extractor.extract_features(board, trapdoor_tracker)
-
-                # Convert to tensor
-                features_tensor = torch.FloatTensor(features).unsqueeze(0)  # Add batch dimension
-
-                # Get NN prediction
-                with torch.no_grad():
-                    nn_output = nn_evaluator(features_tensor)
-                    nn_score_raw = nn_output.item()
-
-                # NN was trained with normalized scores (roughly [-2, +2])
-                # Convert back to heuristic scale (multiply by ~1500)
-                nn_score = nn_score_raw * 1500.0
-
-                # Blend with heuristics (80% NN, 20% heuristic for stability)
-                heuristic_score = self._get_heuristic_score(board)
-                blended_score = 0.8 * nn_score + 0.2 * heuristic_score
-
-                return blended_score
-
-            except Exception as e:
-                # NN failed, fall back to heuristics
-                pass
-
-        # Fallback: pure heuristic evaluation
-        return self._get_heuristic_score(board)
-
-    def _get_heuristic_score(self, board: board_module.Board) -> float:
-        """Get heuristic-based score (fallback when NN not available)"""
         # Material advantage (most important)
         my_eggs = board.chicken_player.get_eggs_laid()
         enemy_eggs = board.chicken_enemy.get_eggs_laid()
-        egg_diff = (my_eggs - enemy_eggs) * 300.0  # Use improved 300 per egg
+        egg_diff = (my_eggs - enemy_eggs) * 100.0
 
         # Mobility advantage
         my_moves = len(board.get_valid_moves())
@@ -334,8 +296,19 @@ class MoveEvaluator:
         # Positional factors
         positional_score = self._evaluate_position_quality(board)
 
+        # Neural network evaluation (if available and trained)
+        # Note: nn_evaluator is kept for compatibility but not used (no torch)
+        nn_score = 0.0
+        if nn_evaluator is not None:
+            try:
+                # This would use the neural network
+                # For now, placeholder (no torch implementation)
+                nn_score = 0.0
+            except:
+                pass
+
         # Combine scores
-        total = egg_diff + mobility_diff + positional_score
+        total = egg_diff + mobility_diff + positional_score + nn_score
 
         return total
 

@@ -1,0 +1,66 @@
+# TEST Configuration for AgentPro - Local Testing
+# Small model and few epochs to verify everything works
+
+data:
+  train_file: 'training_data_test.json'  # Will generate small dataset
+  val_split: 0.15
+  test_split: 0.10
+  augment: false                # Skip augmentation for speed
+  noise_level: 0.0
+
+model:
+  input_size: 128
+  hidden_size: 256              # Smaller for local testing
+  num_residual_blocks: 3        # Fewer blocks
+  dropout: 0.3
+
+training:
+  epochs: 20                    # Just 20 epochs to verify
+  batch_size: 64                # Smaller batch for CPU/local GPU
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  gradient_clip: 1.0
+  betas: [0.9, 0.999]
+
+  # No mixed precision for CPU
+  use_amp: false
+
+  # Learning rate schedule
+  scheduler:
+    type: 'reduce_on_plateau'
+    factor: 0.5
+    patience: 5
+    min_lr: 0.00001
+
+  # Early stopping
+  early_stopping:
+    patience: 10
+    min_delta: 0.001
+
+# Checkpointing
+checkpoint:
+  save_every_n_epochs: 5
+  save_every_n_minutes: 30
+  keep_best: 2
+
+# Logging
+logging:
+  use_tensorboard: true
+  tensorboard_dir: 'runs_test'
+  log_every_n_batches: 10
+  print_every_n_epochs: 1
+
+# Hardware
+hardware:
+  device: 'cuda'                # Will fallback to CPU if no GPU
+  num_workers: 4                # Fewer workers for local
+  pin_memory: false
+
+# Data generation (for reference)
+data_generation:
+  num_positions: 2000           # Small dataset for testing
+  depth_for_labels: 6           # Shallower for speed
+  num_processes: 4              # Fewer processes
+  min_moves: 8
+  max_moves: 25
+  move_variety: 'weighted'
