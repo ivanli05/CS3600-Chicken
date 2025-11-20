@@ -4,7 +4,7 @@
 #SBATCH -N1 --ntasks-per-node=1
 #SBATCH --cpus-per-task=32              # Use all CPU cores for parallel generation
 #SBATCH --mem=64GB                       # Memory for parallel workers
-#SBATCH --time=8:00:00                  # 8 hours (200k @ depth 7 takes ~5-7 hours)
+#SBATCH --time=8:00:00                  # 8 hours (350k @ depth 7 takes ~5.6 hours)
 #SBATCH -o logs/datagen_ultimate-%j.out
 #SBATCH --mail-type=BEGIN,END,FAIL
 
@@ -45,10 +45,10 @@ echo "Working directory: $(pwd)"
 echo ""
 
 echo "Starting ULTIMATE data generation..."
-echo "Target: 200,000 positions"
+echo "Target: 350,000 positions"
 echo "Depth: 7 (high quality evaluation)"
 echo "Workers: 32 (parallel)"
-echo "Expected time: 5-7 hours"
+echo "Expected time: ~5.6 hours (based on PACE benchmark)"
 echo ""
 
 # Run data generation

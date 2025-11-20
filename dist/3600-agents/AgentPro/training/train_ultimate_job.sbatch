@@ -11,7 +11,7 @@
 
 # ============================================================================
 # ULTIMATE Model Training on PACE H100
-# Trains 512-hidden, 6-block residual network on 200k positions
+# Trains 512-hidden, 6-block residual network on 350k positions
 # ============================================================================
 
 echo "=========================================="
@@ -70,7 +70,7 @@ echo ""
 echo "Starting ULTIMATE model training..."
 echo "Configuration: config_ultimate.yaml"
 echo "  - Model: 512 hidden, 6 residual blocks"
-echo "  - Data: 200k positions (24k val, 16k test)"
+echo "  - Data: 350k positions (42k val, 28k test)"
 echo "  - Training: 400 epochs, batch 512, mixed precision"
 echo "  - Early stopping: patience 40"
 echo ""

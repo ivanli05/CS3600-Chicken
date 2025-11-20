@@ -255,8 +255,8 @@ def main():
 
     # Configuration
     config = {
-        'num_positions': 200000,  # 200k positions - use full 8hr window
-        'depth': 7,              # Depth 7 for higher quality labels
+        'num_positions': 350000,  # 350k positions - optimized for 8hr PACE window
+        'depth': 7,              # Depth 7 for high quality labels (~5.6 hrs on PACE)
         'min_moves': 8,          # Skip very early positions
         'max_moves': 30,         # Don't go to endgame (boring)
         'move_variety': 'weighted',  # weighted, uniform, or smart

@@ -4,8 +4,8 @@
 
 data:
   train_file: 'training_data_ultimate.json'
-  val_split: 0.12           # 12% validation (24k positions)
-  test_split: 0.08          # 8% test (16k positions)
+  val_split: 0.12           # 12% validation (42k positions)
+  test_split: 0.08          # 8% test (28k positions)
   augment: true
   noise_level: 0.01         # Light noise for regularization
 
@@ -59,7 +59,7 @@ hardware:
 
 # Data generation (for reference)
 data_generation:
-  num_positions: 200000
+  num_positions: 350000
   depth_for_labels: 7
   num_processes: 32
   min_moves: 8
