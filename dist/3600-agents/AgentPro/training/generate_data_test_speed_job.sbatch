@@ -1,19 +1,20 @@
 #!/bin/bash
-#SBATCH --job-name=AgentPro_DataGen_Ultimate
+#SBATCH --job-name=AgentPro_SpeedTest
 #SBATCH --partition=coc-cpu             # Use COC CPU partition
 #SBATCH -N1 --ntasks-per-node=1
 #SBATCH --cpus-per-task=32              # Use all CPU cores for parallel generation
 #SBATCH --mem=64GB                       # Memory for parallel workers
-#SBATCH --time=12:00:00                 # 12 hours (60k @ depth 9, ~1.5 pos/s = 11.1 hrs)
-#SBATCH -o logs/datagen_ultimate-%j.out
+#SBATCH --time=0:10:00                  # 10 minutes for quick test
+#SBATCH -o logs/speedtest-%j.out
 #SBATCH --mail-type=BEGIN,END,FAIL
 
 # ============================================================================
-# ULTIMATE Training Data Generation on PACE
-# Generates 60k ultra-high-quality positions with depth 9 minimax labels
+# SPEED TEST - Benchmark depth 9 performance on PACE
+# Generates 100 positions to measure actual positions/second
 # ============================================================================
 
 echo "=========================================="
+echo "DEPTH 9 SPEED TEST"
 echo "Job started at: $(date)"
 echo "Job ID: $SLURM_JOB_ID"
 echo "Node: $SLURM_NODELIST"
@@ -44,34 +45,25 @@ cd $SLURM_SUBMIT_DIR
 echo "Working directory: $(pwd)"
 echo ""
 
-echo "Starting ULTIMATE data generation..."
-echo "Target: 60,000 positions"
-echo "Depth: 9 (ultra-high quality evaluation)"
+echo "Testing depth 9 generation speed..."
+echo "Target: 100 positions (for accurate measurement)"
+echo "Depth: 9 (ultra-high quality)"
 echo "Workers: 32 (parallel)"
-echo "Expected time: ~11 hours (depth 9 is very thorough)"
+echo "Expected time: 1-2 minutes"
 echo ""
 
-# Run data generation
-python -u generate_data_ultimate.py
+# Run speed test
+python -u generate_data_test_speed.py
 
 echo ""
 echo "=========================================="
 echo "Job finished at: $(date)"
 echo "=========================================="
 
-# Check if output file was created
-if [ -f "training_data_ultimate.json" ]; then
-    echo "✓ Data generation successful!"
-    ls -lh training_data_ultimate.json
-
-    # Create backup with timestamp
-    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    cp training_data_ultimate.json "training_data_ultimate_${TIMESTAMP}.json"
-    echo "✓ Backup created: training_data_ultimate_${TIMESTAMP}.json"
-else
-    echo "✗ ERROR: training_data_ultimate.json not found!"
-    exit 1
-fi
-
+# Display final rate for easy calculation
 echo ""
-echo "Next step: sbatch train_ultimate_job.sbatch"
+echo "Use the final rate to calculate:"
+echo "  - If rate is 2.0 pos/s → 60k positions = 8.3 hours"
+echo "  - If rate is 1.5 pos/s → 60k positions = 11.1 hours"
+echo "  - If rate is 1.0 pos/s → 60k positions = 16.7 hours"
+echo ""

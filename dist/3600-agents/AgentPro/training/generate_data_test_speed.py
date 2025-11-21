@@ -1,16 +1,12 @@
 """
-ULTIMATE Training Data Generation for AgentPro Neural Network
+SPEED TEST - Benchmark depth 9 performance on PACE
 
-This generates high-quality training data with:
-1. Proper value calculation (no broken tanh compression)
-2. Complete 128-feature extraction
-3. Superior heuristics from AgentProNoNets
-4. Diverse, realistic positions
-5. Deep minimax evaluation
+Quick test to measure actual positions/second at depth 9.
+Generates 100 positions to get accurate timing.
 
-Run: python generate_data_ultimate.py
+Run: python generate_data_test_speed.py
 
-For PACE: sbatch generate_data_ultimate_job.sbatch
+For PACE: sbatch generate_data_test_speed_job.sbatch
 """
 
 import sys
@@ -255,17 +251,17 @@ def main():
 
     # Configuration
     config = {
-        'num_positions': 60000,  # 60k high-quality positions for 12hr window @ depth 9
-        'depth': 9,              # Depth 9 for maximum quality labels (~1.5 pos/s on PACE)
+        'num_positions': 100,    # Quick test: 100 positions to benchmark depth 9 speed
+        'depth': 9,              # Depth 9 for maximum quality labels
         'min_moves': 8,          # Skip very early positions
         'max_moves': 30,         # Don't go to endgame (boring)
         'move_variety': 'weighted',  # weighted, uniform, or smart
         'num_processes': 32,     # Match SBATCH CPU allocation
-        'output_file': 'training_data_ultimate.json'
+        'output_file': 'training_data_test_speed.json'
     }
 
     print(f"{'='*70}")
-    print(f"ULTIMATE Training Data Generation")
+    print(f"DEPTH 9 SPEED TEST")
     print(f"{'='*70}")
     print(f"Target positions: {config['num_positions']:,}")
     print(f"Search depth for labels: {config['depth']}")
@@ -275,7 +271,7 @@ def main():
     print(f"Output: {config['output_file']}")
     print(f"{'='*70}\n")
 
-    print("⚠ This will take several hours. Consider running on PACE with GPU job.")
+    print("⚠ Speed test - will complete in 1-2 minutes")
     print()
 
     # Prepare worker arguments
