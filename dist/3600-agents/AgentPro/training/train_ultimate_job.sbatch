@@ -2,10 +2,10 @@
 #SBATCH --job-name=AgentPro_Train_Ultimate
 #SBATCH --partition=coc-gpu             # Use COC GPU partition (adjust if needed)
 #SBATCH -N1 --ntasks-per-node=1
-#SBATCH --gres=gpu:H100:1               # 1 H100 GPU (or gpu:1 for any GPU)
+#SBATCH --gres=gpu:1                    # 1 GPU (any available)
 #SBATCH --cpus-per-task=8               # CPU cores for data loading
-#SBATCH --mem=64GB                       # Memory for large model and data
-#SBATCH --time=8:00:00                  # 8 hours (sufficient for 100k positions)
+#SBATCH --mem=32GB                      # Memory for model and data
+#SBATCH --time=8:00:00                  # 8 hours (sufficient for 15k positions)
 #SBATCH -o logs/train_ultimate-%j.out
 #SBATCH --mail-type=BEGIN,END,FAIL
 
