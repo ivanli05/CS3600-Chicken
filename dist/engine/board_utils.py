@@ -85,15 +85,14 @@ def get_history_dict(board: Board,trapdoors=[],spawns = [[], []], errlog_a="", e
 
     left_behind = []
     for val in history_dict["left_behind_enums"]:
-        match val:
-            case MoveType.PLAIN:
-                left_behind.append("plain")
-            case MoveType.EGG:
-                left_behind.append("egg")
-            case MoveType.TURD:
-                left_behind.append("turd")
-            case _:
-                left_behind.append("plain")
+        if val == MoveType.PLAIN:
+            left_behind.append("plain")
+        elif val == MoveType.EGG:
+            left_behind.append("egg")
+        elif val == MoveType.TURD:
+            left_behind.append("turd")
+        else:
+            left_behind.append("plain")
     history_dict["left_behind"] = left_behind
     history_dict.pop("left_behind_enums", None)
 

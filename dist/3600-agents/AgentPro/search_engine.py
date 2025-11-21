@@ -34,7 +34,10 @@ class SearchEngine:
         self,
         board: board_module.Board,
         time_left: Callable,
-        trapdoor_tracker=None
+        trapdoor_tracker=None,
+        visited_squares=None,
+        recent_positions=None,
+        blocked_locations=None
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """
         Main search entry point.
@@ -44,15 +47,31 @@ class SearchEngine:
         available_time = time_left()
         search_time = min(available_time * self.time_limit, 2.0)
 
+        # Adaptive depth: search deeper in endgame and when we have lots of time
+        depth = self.max_depth
+        turns_left = getattr(board, 'turns_left_player', 40)
+
+        if turns_left <= 10 and available_time > 30:
+            # Endgame with time: search deeper!
+            depth = min(self.max_depth + 2, 6)
+        elif turns_left <= 20 and available_time > 60:
+            depth = min(self.max_depth + 1, 5)
+        elif available_time > 120:
+            # Lots of time early game: search deeper
+            depth = min(self.max_depth + 1, 5)
+
         # Use minimax with alpha-beta pruning
         score, best_move = self._minimax(
             board=board,
-            depth=self.max_depth,
+            depth=depth,
             alpha=float('-inf'),
             beta=float('inf'),
             maximizing=True,
             time_left=search_time,
-            trapdoor_tracker=trapdoor_tracker
+            trapdoor_tracker=trapdoor_tracker,
+            visited_squares=visited_squares,
+            recent_positions=recent_positions,
+            blocked_locations=blocked_locations
         )
 
         return score, best_move
@@ -65,7 +84,10 @@ class SearchEngine:
         beta: float,
         maximizing: bool,
         time_left: float,
-        trapdoor_tracker=None
+        trapdoor_tracker=None,
+        visited_squares=None,
+        recent_positions=None,
+        blocked_locations=None
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """
         Minimax algorithm with alpha-beta pruning.
@@ -78,6 +100,9 @@ class SearchEngine:
             maximizing: True if maximizing player's turn
             time_left: Remaining search time
             trapdoor_tracker: Trapdoor probability tracker
+            visited_squares: Set of visited squares (for anti-repetition)
+            recent_positions: Recent positions (for anti-repetition)
+            blocked_locations: Blocked locations (enemy eggs/turds)
 
         Returns: (score, best_move)
         """

@@ -47,9 +47,20 @@ class MoveEvaluator:
         if board.is_cell_blocked(new_loc):
             score -= 50000.0  # Same penalty for currently blocked locations
 
+        # 0. ENDGAME BONUS: Eggs are MORE valuable near end of game!
+        # Game ends at turn 40, so maximize eggs in last 10 turns
+        turns_left = getattr(board, 'turns_left_player', 40)
+        endgame_multiplier = 1.0
+        if turns_left <= 10:
+            # Last 10 turns: eggs are 2x more valuable!
+            endgame_multiplier = 2.0
+        elif turns_left <= 20:
+            # Last 20 turns: eggs are 1.5x more valuable
+            endgame_multiplier = 1.5
+
         # 1. Egg moves are HIGHLY valuable (direct scoring) - EMPHASIZED!
         if move_type == MoveType.EGG:
-            score += 300.0  # INCREASED from 100.0 - much stronger emphasis on egg laying!
+            score += 300.0 * endgame_multiplier  # Increased in endgame!
             
             # Bonus for laying eggs in new/unexplored areas - encourages spreading eggs
             if visited_squares is None or new_loc not in visited_squares:
@@ -210,26 +221,37 @@ class MoveEvaluator:
         if self._is_edge(new_loc):
             score -= 10.0
         
-        # 6. STRONG anti-repetition: penalize revisiting squares, especially recent ones
-        # This prevents the agent from repeating the same few squares
+        # 6. MASSIVE anti-repetition: heavily penalize revisiting squares, especially recent ones
+        # This prevents the agent from wasting moves going back and forth
         if recent_positions is not None and len(recent_positions) > 0:
             # Check if this location was visited recently (last 8 moves)
             if new_loc in recent_positions:
-                # VERY STRONG penalty for recently visited squares - prevents repetition!
+                # EXTREME penalty for recently visited squares - absolutely prevents loops!
                 # The more recent, the worse (check position in list)
                 recent_index = recent_positions.index(new_loc)
                 # More recent = higher penalty (last move = worst, 8 moves ago = less bad)
-                recency_penalty = (len(recent_positions) - recent_index) * 150.0
-                score -= 500.0 + recency_penalty  # Base 500 + recency multiplier
-        
+                recency_penalty = (len(recent_positions) - recent_index) * 300.0
+                score -= 2000.0 + recency_penalty  # Massive base penalty + recency multiplier
+
+                # Extra penalty if this creates a loop (going back to same square multiple times)
+                visit_count = recent_positions.count(new_loc)
+                if visit_count > 1:
+                    score -= visit_count * 1000.0  # Each repeat visit costs 1000 points
+
         # 6.5. Encourage exploration - penalize revisiting ANY visited squares
         if visited_squares is not None:
             if new_loc in visited_squares:
-                # Penalty for revisiting any visited square (even if not recent)
-                score -= 400.0  # Increased from 200 to strongly discourage repetition
+                # Strong penalty for revisiting any visited square (even if not recent)
+                score -= 800.0  # DOUBLED from 400 - very strong discouragement
+
+                # Count how many times we've visited this square
+                visit_count = sum(1 for pos in (recent_positions or []) if pos == new_loc)
+                if visit_count > 0:
+                    # Exponential penalty for multiple visits to same square
+                    score -= visit_count * visit_count * 500.0  # 1st=500, 2nd=2000, 3rd=4500
             else:
-                # LARGE bonus for exploring new squares - encourages map exploration and egg placement
-                score += 150.0  # Increased from 120 to strongly reward exploration
+                # HUGE bonus for exploring new squares - strongly rewards exploration
+                score += 300.0  # DOUBLED from 150 - very strong reward for new areas
                 
                 # Extra bonus for exploring different regions of the map
                 # Encourage visiting all quadrants/areas
@@ -324,18 +346,41 @@ class MoveEvaluator:
         enemy_eggs = board.chicken_enemy.get_eggs_laid()
         egg_diff = (my_eggs - enemy_eggs) * 300.0  # Use improved 300 per egg
 
-        # Mobility advantage
+        # Mobility advantage - CRITICAL for avoiding traps!
         my_moves = len(board.get_valid_moves())
         board.reverse_perspective()
         enemy_moves = len(board.get_valid_moves())
         board.reverse_perspective()
-        mobility_diff = (my_moves - enemy_moves) * 5.0
+
+        # If enemy has NO moves, they lose and we get 5 eggs (1500 points)!
+        if enemy_moves == 0:
+            mobility_score = 2000.0  # Winning position!
+        # If WE have no moves, we lose and enemy gets 5 eggs
+        elif my_moves == 0:
+            mobility_score = -2000.0  # Losing position!
+        else:
+            # Normal mobility advantage - very important!
+            # Each move difference is worth ~50 points (not 5!)
+            # Having more moves = safer from traps + more options
+            mobility_score = (my_moves - enemy_moves) * 50.0
+
+            # Extra penalty for low mobility (danger of getting trapped)
+            if my_moves <= 2:
+                mobility_score -= 200.0  # Very dangerous!
+            elif my_moves <= 3:
+                mobility_score -= 100.0  # Risky
+
+            # Bonus for reducing enemy mobility (trying to trap them)
+            if enemy_moves <= 2:
+                mobility_score += 200.0  # We're trapping them!
+            elif enemy_moves <= 3:
+                mobility_score += 100.0
 
         # Positional factors
         positional_score = self._evaluate_position_quality(board)
 
         # Combine scores
-        total = egg_diff + mobility_diff + positional_score
+        total = egg_diff + mobility_score + positional_score
 
         return total
 
