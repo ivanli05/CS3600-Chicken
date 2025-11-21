@@ -4,13 +4,14 @@
 #SBATCH -N1 --ntasks-per-node=1
 #SBATCH --cpus-per-task=32              # Use all CPU cores for parallel generation
 #SBATCH --mem=64GB                       # Memory for parallel workers
-#SBATCH --time=12:00:00                 # 12 hours (60k @ depth 9, ~1.5 pos/s = 11.1 hrs)
+#SBATCH --time=8:00:00                  # 8 hours (15k @ depth 9, 0.74 pos/s = 5.6 hrs, very safe)
 #SBATCH -o logs/datagen_ultimate-%j.out
 #SBATCH --mail-type=BEGIN,END,FAIL
 
 # ============================================================================
 # ULTIMATE Training Data Generation on PACE
-# Generates 60k ultra-high-quality positions with depth 9 minimax labels
+# Generates 15k ultra-high-quality positions with depth 9 minimax labels
+# Measured rate: 0.74 pos/s → 15k positions in ~5.6 hours
 # ============================================================================
 
 echo "=========================================="
@@ -45,10 +46,10 @@ echo "Working directory: $(pwd)"
 echo ""
 
 echo "Starting ULTIMATE data generation..."
-echo "Target: 60,000 positions"
+echo "Target: 15,000 positions"
 echo "Depth: 9 (ultra-high quality evaluation)"
 echo "Workers: 32 (parallel)"
-echo "Expected time: ~11 hours (depth 9 is very thorough)"
+echo "Expected time: ~5.6 hours (measured: 0.74 pos/s)"
 echo ""
 
 # Run data generation
