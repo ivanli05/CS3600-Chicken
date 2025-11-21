@@ -3,7 +3,7 @@
 #SBATCH --partition=coc-gpu             # Use COC GPU partition (adjust if needed)
 #SBATCH -N1 --ntasks-per-node=1
 #SBATCH --gres=gpu:H100:1               # 1 H100 GPU (or gpu:1 for any GPU)
-#SBATCH --cpus-per-task=16              # CPU cores for data loading
+#SBATCH --cpus-per-task=8               # CPU cores for data loading
 #SBATCH --mem=64GB                       # Memory for large model and data
 #SBATCH --time=8:00:00                  # 8 hours (sufficient for 100k positions)
 #SBATCH -o logs/train_ultimate-%j.out
@@ -69,8 +69,8 @@ echo ""
 
 echo "Starting ULTIMATE model training..."
 echo "Configuration: config_ultimate.yaml"
-echo "  - Model: 512 hidden, 6 residual blocks"
-echo "  - Data: 350k positions (42k val, 28k test)"
+echo "  - Model: 256 hidden, 3 residual blocks"
+echo "  - Data: 15k positions (depth 9 labels)"
 echo "  - Training: 400 epochs, batch 512, mixed precision"
 echo "  - Early stopping: patience 40"
 echo ""

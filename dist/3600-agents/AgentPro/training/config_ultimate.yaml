@@ -11,8 +11,8 @@ data:
 
 model:
   input_size: 128           # Full feature vector!
-  hidden_size: 512          # 2x larger than before
-  num_residual_blocks: 6    # 3x more blocks
+  hidden_size: 256          # Right-sized for 15k positions
+  num_residual_blocks: 3    # Balanced depth
   dropout: 0.3              # Higher dropout for larger model
 
 training:
@@ -54,13 +54,13 @@ logging:
 # Hardware
 hardware:
   device: 'cuda'
-  num_workers: 16           # Data loading threads
+  num_workers: 8            # Optimized for 15k dataset
   pin_memory: true
 
 # Data generation (for reference)
 data_generation:
-  num_positions: 350000
-  depth_for_labels: 7
+  num_positions: 15000
+  depth_for_labels: 9
   num_processes: 32
   min_moves: 8
   max_moves: 30
