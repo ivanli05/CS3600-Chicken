@@ -22,15 +22,6 @@ import game.board as board_module
 from .trapdoor_tracker import TrapdoorTracker
 from .search_engine import SearchEngine
 from .heuristics import MoveEvaluator
-from .feature_extractor import FeatureExtractor
-
-# Try to import neural network
-try:
-    import torch
-    from .evaluator import PositionEvaluator
-    TORCH_AVAILABLE = True
-except ImportError:
-    TORCH_AVAILABLE = False
 
 
 class PlayerAgent:
@@ -45,26 +36,6 @@ class PlayerAgent:
         # Initialize components
         self.trapdoor_tracker = TrapdoorTracker(map_size=self.map_size)
         self.move_evaluator = MoveEvaluator(map_size=self.map_size)
-        self.feature_extractor = FeatureExtractor(map_size=self.map_size)
-
-        # Neural network evaluator (if available)
-        self.nn_evaluator = None
-        self.use_nn_eval = False
-        if TORCH_AVAILABLE:
-            try:
-                self.nn_evaluator = PositionEvaluator(
-                    input_size=128,
-                    hidden_size=512,
-                    num_blocks=6,
-                    dropout=0.3
-                )
-                loaded = self.nn_evaluator.load_weights()
-                if loaded:
-                    self.nn_evaluator.eval()
-                    self.use_nn_eval = True
-            except Exception:
-                self.nn_evaluator = None
-
         self.search_engine = SearchEngine(
             evaluator=self.move_evaluator,
             max_depth=4,  # Search depth
@@ -79,6 +50,8 @@ class PlayerAgent:
         self.last_move_target: Optional[Tuple[int, int]] = None  # Track where we tried to move
         self.blocked_locations: set = set()  # Track enemy eggs/barriers that block movement
         self.turn_count = 0
+
+        print(f"✓ AgentB initialized (search_depth={self.search_engine.max_depth})")
 
     def play(
         self,
