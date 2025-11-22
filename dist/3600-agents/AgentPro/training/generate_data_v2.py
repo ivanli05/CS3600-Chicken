@@ -40,7 +40,20 @@ class PositionGenerator:
         if seed is not None:
             np.random.seed(seed)
 
-        board = Board()
+        # Import game modules
+        from game.game_map import GameMap
+        from game.trapdoor_manager import TrapdoorManager
+
+        # Create board with game map
+        game_map = GameMap()
+        trapdoor_manager = TrapdoorManager(game_map)
+        board = Board(game_map)
+
+        # Initialize chickens at spawn positions
+        spawns = trapdoor_manager.choose_spawns()
+        board.chicken_player.start(spawns[0], 0)
+        board.chicken_enemy.start(spawns[1], 1)
+
         num_moves = np.random.randint(min_moves, max_moves + 1)
 
         # Play random moves with weighted selection (favor EGG moves)
@@ -70,8 +83,13 @@ class PositionGenerator:
             move_idx = np.random.choice(len(valid_moves), p=move_weights)
             move = valid_moves[move_idx]
 
-            # Apply move
-            board.play_move(move[0], move[1])
+            # Apply move using forecast (safer than play_move)
+            board = board.forecast_move(move[0], move[1], check_ok=False)
+            if board is None:
+                return None  # Invalid move, skip this position
+
+            # Switch perspective for next player
+            board.reverse_perspective()
 
         # Skip if game is over
         if board.is_game_over():
@@ -178,7 +196,7 @@ def main():
     print("="*70)
 
     # Configuration
-    TARGET_POSITIONS = 30000
+    TARGET_POSITIONS = 20000
     DEPTH = 9
     MIN_MOVES = 8
     MAX_MOVES = 30
@@ -197,7 +215,7 @@ def main():
 
     print(f"\nStarting parallel generation...")
     print(f"Each worker will generate ~{positions_per_worker} positions")
-    print(f"Estimated time: ~4-5 hours (at 0.74 pos/s per worker)")
+    print(f"Estimated time: ~7.5 hours (at 0.74 pos/s per worker)")
     print()
 
     start_time = datetime.now()

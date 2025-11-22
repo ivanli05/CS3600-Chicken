@@ -1,5 +1,5 @@
 # Training Configuration v2 for AgentPro
-# 30k positions with improved anti-repetition heuristics
+# 20k positions with improved anti-repetition heuristics (optimal size for 320-hidden model)
 
 data:
   train_file: 'training_data_v2.json'
@@ -58,7 +58,7 @@ hardware:
 
 # Data generation (for reference)
 data_generation:
-  num_positions: 30000
+  num_positions: 20000
   depth_for_labels: 9
   num_processes: 32
   min_moves: 8

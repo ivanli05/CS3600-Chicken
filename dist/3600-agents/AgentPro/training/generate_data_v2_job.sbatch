@@ -4,15 +4,15 @@
 #SBATCH -N1 --ntasks-per-node=1
 #SBATCH --cpus-per-task=32              # Use all CPU cores for parallel generation
 #SBATCH --mem=64GB                       # Memory for parallel workers
-#SBATCH --time=8:00:00                  # 8 hours (30k @ depth 9, 0.74 pos/s = ~11 hrs, safe buffer)
+#SBATCH --time=10:00:00                 # 10 hours (20k @ depth 9, ~7.5hr expected, 2.5hr buffer for PACE instability)
 #SBATCH -o logs/datagen_v2-%j.out
 #SBATCH --mail-type=BEGIN,END,FAIL
 
 # ============================================================================
 # Training Data Generation v2 on PACE
-# Generates 30k ultra-high-quality positions with depth 9 minimax labels
+# Generates 20k ultra-high-quality positions with depth 9 minimax labels
 # Improved anti-repetition heuristics to prevent looping behavior
-# Measured rate: 0.74 pos/s → 30k positions in ~11 hours
+# Measured rate: 0.74 pos/s → 20k positions in ~7.5 hours
 # ============================================================================
 
 echo "=========================================="
@@ -47,10 +47,10 @@ echo "Working directory: $(pwd)"
 echo ""
 
 echo "Starting v2 data generation..."
-echo "Target: 30,000 positions"
+echo "Target: 20,000 positions"
 echo "Depth: 9 (ultra-high quality evaluation)"
 echo "Workers: 32 (parallel)"
-echo "Expected time: ~11 hours (measured: 0.74 pos/s)"
+echo "Expected time: ~7.5 hours (measured: 0.74 pos/s)"
 echo "Improvements: Stronger anti-repetition penalties"
 echo ""
 
