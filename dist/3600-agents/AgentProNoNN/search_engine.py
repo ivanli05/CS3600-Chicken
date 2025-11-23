@@ -116,7 +116,7 @@ class SearchEngine:
             return self._evaluate_terminal(board), None
 
         # Transposition table lookup
-        board_hash = self._hash_board(board)
+        board_hash = self._hash_board(board, None)  # Don't include recent positions
         if board_hash in self.transposition_table:
             cached_depth, cached_score, cached_move = self.transposition_table[board_hash]
             # Use cached result if it was searched at equal or greater depth
@@ -131,18 +131,21 @@ class SearchEngine:
 
         # Order moves for better pruning
         ordered_moves = self._order_moves(
-            valid_moves, board, depth, trapdoor_tracker
+            valid_moves, board, depth, trapdoor_tracker,
+            visited_squares, recent_positions, blocked_locations
         )
 
         if maximizing:
             score, move = self._maximize(
                 board, ordered_moves, depth, alpha, beta,
-                time_left, trapdoor_tracker
+                time_left, trapdoor_tracker,
+                visited_squares, recent_positions, blocked_locations
             )
         else:
             score, move = self._minimize(
                 board, ordered_moves, depth, alpha, beta,
-                time_left, trapdoor_tracker
+                time_left, trapdoor_tracker,
+                visited_squares, recent_positions, blocked_locations
             )
 
         # Store in transposition table
@@ -158,7 +161,10 @@ class SearchEngine:
         alpha: float,
         beta: float,
         time_left: float,
-        trapdoor_tracker=None
+        trapdoor_tracker=None,
+        visited_squares=None,
+        recent_positions=None,
+        blocked_locations=None
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """Maximizing player's turn"""
         max_score = float('-inf')
@@ -174,11 +180,15 @@ class SearchEngine:
                 if forecast is None:
                     continue
 
+                # DON'T track visited squares in search tree - it poisons future moves!
+                # Only use visited_squares for ROOT move ordering, not in search
+
                 # Switch perspective and recurse
                 forecast.reverse_perspective()
                 score, _ = self._minimax(
                     forecast, depth - 1, alpha, beta, False,
-                    time_left - 0.01, trapdoor_tracker
+                    time_left - 0.01, trapdoor_tracker,
+                    None, None, blocked_locations  # Pass None for visited tracking
                 )
                 forecast.reverse_perspective()
 
@@ -207,7 +217,10 @@ class SearchEngine:
         alpha: float,
         beta: float,
         time_left: float,
-        trapdoor_tracker=None
+        trapdoor_tracker=None,
+        visited_squares=None,
+        recent_positions=None,
+        blocked_locations=None
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """Minimizing player's turn"""
         min_score = float('inf')
@@ -222,10 +235,13 @@ class SearchEngine:
                 if forecast is None:
                     continue
 
+                # DON'T track visited squares in search tree - it poisons future moves!
+
                 forecast.reverse_perspective()
                 score, _ = self._minimax(
                     forecast, depth - 1, alpha, beta, True,
-                    time_left - 0.01, trapdoor_tracker
+                    time_left - 0.01, trapdoor_tracker,
+                    None, None, blocked_locations  # Pass None for visited tracking
                 )
                 forecast.reverse_perspective()
 
@@ -248,7 +264,10 @@ class SearchEngine:
         moves: List[Tuple[Direction, MoveType]],
         board: board_module.Board,
         depth: int,
-        trapdoor_tracker=None
+        trapdoor_tracker=None,
+        visited_squares=None,
+        recent_positions=None,
+        blocked_locations=None
     ) -> List[Tuple[Direction, MoveType]]:
         """
         Order moves for better alpha-beta pruning efficiency.
@@ -273,9 +292,10 @@ class SearchEngine:
             elif move[1] == MoveType.TURD:
                 score += 500.0
 
-            # 4. Positional evaluation
+            # 4. Positional evaluation (now with position history for anti-repetition)
             score += self.evaluator.quick_evaluate_move(
-                move, board, trapdoor_tracker
+                move, board, trapdoor_tracker,
+                visited_squares, recent_positions, blocked_locations
             )
 
             move_scores.append((score, move))
@@ -322,8 +342,12 @@ class SearchEngine:
         self.history_table.clear()
         self.transposition_table.clear()
 
-    def _hash_board(self, board: board_module.Board) -> int:
-        """Create a hash of the board state for transposition table"""
+    def _hash_board(self, board: board_module.Board, recent_positions=None) -> int:
+        """Create a hash of the board state for transposition table
+
+        Includes recent position history to prevent incorrect cache hits when
+        the board state is the same but the path to get there differs.
+        """
         # Hash based on all relevant game state
         my_loc = board.chicken_player.get_location()
         enemy_loc = board.chicken_enemy.get_location()
@@ -331,6 +355,10 @@ class SearchEngine:
         enemy_eggs = frozenset(board.eggs_enemy)
         my_turds = frozenset(board.turds_player)
         enemy_turds = frozenset(board.turds_enemy)
+
+        # Include recent positions to differentiate paths with same board state
+        # Only include last 3 positions to keep hash space manageable
+        recent_tuple = tuple(recent_positions[-3:]) if recent_positions and len(recent_positions) > 0 else ()
 
         return hash((
             my_loc,
@@ -340,5 +368,6 @@ class SearchEngine:
             my_turds,
             enemy_turds,
             board.chicken_player.get_turds_left(),
-            board.chicken_enemy.get_turds_left()
+            board.chicken_enemy.get_turds_left(),
+            recent_tuple
         ))
