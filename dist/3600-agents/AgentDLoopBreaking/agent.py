@@ -495,7 +495,10 @@ class PlayerAgent:
                 trapdoor_tracker=self.trapdoor_tracker,
                 visited_squares=self.visited_squares,
                 recent_positions=self.recent_positions,
-                blocked_locations=self.blocked_locations
+                blocked_locations=self.blocked_locations,
+                is_oscillating=self.in_loop,
+                loop_center=self.loop_center,
+                force_outward_movement=self.force_outward_movement
             )
 
             if best_move:

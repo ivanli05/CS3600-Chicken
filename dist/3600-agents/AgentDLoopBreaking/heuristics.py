@@ -161,11 +161,28 @@ class MoveEvaluator:
             # Corner eggs are MUCH better - they give 3 eggs instead of 1 (3x value!)
             # CRITICAL: Only incentivize corners where this chicken can lay eggs (parity check)
             # Each chicken can only lay eggs on 2 of the 4 corners (parity-based)
+            # CRITICAL FIX: Add recent corner penalty - if we recently laid an egg here, avoid going back
             if self._is_corner(new_loc):
                 # Check if this chicken can lay eggs on this corner (parity check)
                 can_lay_on_corner = board.chicken_player.can_lay_egg(new_loc)
                 if can_lay_on_corner:
-                    score += 600.0  # REDUCED from 1200 - strong but balanced
+                    # Check if we recently laid an egg in this corner (last 4 positions)
+                    recent_corner_penalty = 0.0
+                    if recent_positions is not None and len(recent_positions) >= 2:
+                        # Check last 4 positions for corner egg placement
+                        very_recent = recent_positions[-4:] if len(recent_positions) >= 4 else recent_positions
+                        for i, pos in enumerate(very_recent):
+                            if pos == new_loc and hasattr(board, 'eggs_player') and board.eggs_player:
+                                if new_loc in board.eggs_player:
+                                    # We recently laid an egg here - STRONG penalty to avoid looping back
+                                    recency = len(very_recent) - i  # More recent = stronger penalty
+                                    recent_corner_penalty = 1500.0 * (1.0 / max(1, recency))  # INCREASED: Strong enough to override +1200 corner bonus
+                                    break
+                    
+                    if recent_corner_penalty > 0:
+                        score -= recent_corner_penalty  # Penalty for going back to corner where we laid egg
+                    else:
+                        score += 600.0  # RESTORED: Original huge bonus for accessible corner eggs! (3x value)
                 else:
                     # Inaccessible corner - minimal bonus (can't lay eggs here anyway)
                     score += 20.0
@@ -245,12 +262,27 @@ class MoveEvaluator:
                             for corner in corners_without_eggs
                         )
                         # Bonus for moving toward accessible corners WITHOUT eggs (the right corners for this chicken)
-                        if min_dist_to_accessible_corner <= 3:
-                            score += 200.0  # Strong bonus for getting close to accessible corner
-                        elif min_dist_to_accessible_corner <= 5:
-                            score += 100.0  # Good bonus for moderate distance
-                        elif min_dist_to_accessible_corner <= 7:
-                            score += 50.0  # Small bonus for far distance
+                        # But check for recent corner penalty first
+                        recent_corner_penalty = 0.0
+                        if recent_positions is not None and len(recent_positions) >= 2:
+                            very_recent = recent_positions[-4:] if len(recent_positions) >= 4 else recent_positions
+                            for corner in corners_without_eggs:
+                                if corner in very_recent and hasattr(board, 'eggs_player') and board.eggs_player:
+                                    if corner in board.eggs_player:
+                                        # Check if we're moving toward a corner where we recently laid an egg
+                                        if min_dist_to_accessible_corner <= 3:
+                                            recent_corner_penalty = 300.0  # Penalty for moving toward corner with recent egg
+                                            break
+                        
+                        if recent_corner_penalty > 0:
+                            score -= recent_corner_penalty  # Penalty overrides bonuses
+                        else:
+                            if min_dist_to_accessible_corner <= 3:
+                                score += 200.0  # RESTORED: Strong bonus for getting close to accessible corner
+                            elif min_dist_to_accessible_corner <= 5:
+                                score += 100.0  # RESTORED: Good bonus for moderate distance
+                            elif min_dist_to_accessible_corner <= 7:
+                                score += 50.0  # RESTORED: Small bonus for far distance
                     
                     # PENALTY: If moving toward a corner that already has an egg
                     if hasattr(board, 'eggs_player') and board.eggs_player:
@@ -452,20 +484,25 @@ class MoveEvaluator:
                 desperation_factor = 0.3  # Significantly reduce penalties when limited
 
             if recent_positions is not None and len(recent_positions) > 0:
-                # Check if this location was visited recently (last 8 moves)
-                if new_loc in recent_positions:
+                # CRITICAL FIX: Only penalize VERY recent positions (last 4 moves)
+                # This prevents over-broad repetition penalties that cause loops
+                very_recent = recent_positions[-4:] if len(recent_positions) >= 4 else recent_positions
+                if new_loc in very_recent:
                     # Apply penalties ONLY if not oscillating
                     if not is_oscillating:
-                        # REDUCED: Moderate penalty for recently visited squares (prevents tight loops)
-                        recent_index = recent_positions.index(new_loc)
-                        # More recent = higher penalty, but more gradual
-                        recency_penalty = (len(recent_positions) - recent_index) * 50.0  # REDUCED from 200
-                        score -= (300.0 + recency_penalty) * desperation_factor  # REDUCED from 1000
+                        # Find position in very recent list
+                        try:
+                            recent_index = very_recent.index(new_loc)
+                            # More recent = higher penalty, but more gradual
+                            recency_penalty = (len(very_recent) - recent_index) * 40.0  # REDUCED further
+                            score -= (200.0 + recency_penalty) * desperation_factor  # REDUCED from 300
 
-                        # REDUCED: Extra penalty if this creates a loop (going back to same square multiple times)
-                        visit_count = recent_positions.count(new_loc)
-                        if visit_count > 1:
-                            score -= visit_count * 150.0 * desperation_factor  # REDUCED from 600
+                            # REDUCED: Extra penalty if this creates a loop (going back to same square multiple times)
+                            visit_count = very_recent.count(new_loc)
+                            if visit_count > 1:
+                                score -= visit_count * 100.0 * desperation_factor  # REDUCED from 150
+                        except ValueError:
+                            pass  # Not in very recent, no penalty
 
                 # CRITICAL: Add STRONG tie-breaking to prevent oscillation
                 # Use multiple factors to ensure different moves have different scores
@@ -484,28 +521,45 @@ class MoveEvaluator:
 
                     # Additional: prefer accessible corners/edges when stuck (forces movement)
                     # CRITICAL: Only incentivize corners where this chicken can lay eggs (parity check)
+                    # REDUCED corner bias to prevent loops
                     if self._is_corner(new_loc):
                         if board.chicken_player.can_lay_egg(new_loc):
-                            score += 500.0  # INCREASED: Accessible corner - strong bonus!
+                            # Check for recent corner penalty first
+                            recent_corner_penalty = 0.0
+                            if recent_positions is not None and len(recent_positions) >= 2:
+                                very_recent = recent_positions[-4:] if len(recent_positions) >= 4 else recent_positions
+                                for i, pos in enumerate(very_recent):
+                                    if pos == new_loc and hasattr(board, 'eggs_player') and board.eggs_player:
+                                        if new_loc in board.eggs_player:
+                                            recency = len(very_recent) - i
+                                            recent_corner_penalty = 400.0 * (1.0 / max(1, recency))
+                                            break
+                            
+                            if recent_corner_penalty > 0:
+                                score -= recent_corner_penalty  # Penalty for going back to corner with egg (overrides bonus)
+                            else:
+                                score += 500.0  # RESTORED: Original strong bonus for accessible corner
                         else:
-                            score += 50.0  # Inaccessible corner - minimal bonus
+                            score += 30.0  # REDUCED from 50 - minimal bonus
                     elif self._is_edge(new_loc):
                         score += 150.0
 
             # Encourage exploration with plain moves (not eggs - eggs can go anywhere)
+            # CRITICAL FIX: Only penalize if VERY recent (last 4 positions)
             if visited_squares is not None:
                 if new_loc in visited_squares:
                     # REDUCED penalties for revisiting - sometimes necessary for exploration
-                    # Apply penalties ONLY if not oscillating
-                    if not is_oscillating:
-                        # Lighter penalty for revisiting squares (reduced from 400)
-                        score -= 150.0 * desperation_factor  # Reduced from 400
+                    # Apply penalties ONLY if not oscillating AND only for very recent positions
+                    if not is_oscillating and recent_positions is not None:
+                        very_recent = recent_positions[-4:] if len(recent_positions) >= 4 else recent_positions
+                        if new_loc in very_recent:
+                            # Only penalize if in very recent positions
+                            score -= 100.0 * desperation_factor  # REDUCED further
 
-                        # Count how many times we've visited this square
-                        visit_count = sum(1 for pos in (recent_positions or []) if pos == new_loc)
-                        if visit_count > 0:
-                            # Lighter penalty for multiple visits (reduced from 250)
-                            score -= visit_count * visit_count * 100.0 * desperation_factor  # Reduced from 250
+                            # Count how many times we've visited this square in very recent
+                            visit_count = very_recent.count(new_loc)
+                            if visit_count > 1:
+                                score -= visit_count * 50.0 * desperation_factor  # REDUCED further
                 else:
                     # Moderate bonus for exploring new squares with plain moves
                     score += 150.0  # Balanced - good incentive but not extreme
@@ -566,28 +620,43 @@ class MoveEvaluator:
                 
                 # STRONGER bonuses for moving toward accessible corners WITHOUT eggs
                 # These corners give 3x egg value, so they're extremely valuable!
+                # But recent corner penalty will override if we recently laid an egg there
                 if visited_squares is None or new_loc not in visited_squares:
-                    # INCREASED: Closer to accessible corner = much better (max distance is ~14 on 8x8 board)
-                    corner_bonus = max(0, (14 - min_dist_to_corner) * 10.0)  # Doubled from 5.0
+                    # RESTORED: Closer to accessible corner = much better (max distance is ~14 on 8x8 board)
+                    corner_bonus = max(0, (14 - min_dist_to_corner) * 10.0)  # RESTORED from 5.0
                     score += corner_bonus
 
-                    # INCREASED: Extra bonus if we're very close to an accessible corner
+                    # RESTORED: Extra bonus if we're very close to an accessible corner
                     if min_dist_to_corner <= 2:
-                        score += 100.0  # INCREASED from 30 - very close to valuable corner!
+                        score += 100.0  # RESTORED from 50 - very close to valuable corner!
                     elif min_dist_to_corner <= 4:
-                        score += 50.0  # INCREASED from 15
+                        score += 50.0  # RESTORED from 25
                     elif min_dist_to_corner <= 6:
-                        score += 25.0  # NEW: Bonus for moderate distance
+                        score += 25.0  # RESTORED from 12
+            
+            # EXTRA BONUS: If this move is actually AT an accessible corner WITHOUT egg
+            # Check for recent corner penalty first - this will override the bonus if we recently laid an egg
+            if new_loc in corners_without_eggs:
+                # Check if we recently laid an egg here (shouldn't happen if corners_without_eggs is correct, but double-check)
+                recent_corner_penalty = 0.0
+                if recent_positions is not None and len(recent_positions) >= 2:
+                    very_recent = recent_positions[-4:] if len(recent_positions) >= 4 else recent_positions
+                    for i, pos in enumerate(very_recent):
+                        if pos == new_loc and hasattr(board, 'eggs_player') and board.eggs_player:
+                            if new_loc in board.eggs_player:
+                                recency = len(very_recent) - i
+                                recent_corner_penalty = 800.0 * (1.0 / max(1, recency))  # Strong enough to override bonuses
+                                break
                 
-                # EXTRA BONUS: If this move is actually AT an accessible corner WITHOUT egg, huge bonus!
-                # This applies to both egg moves (can lay) and plain moves (getting ready to lay)
-                if new_loc in corners_without_eggs:
+                if recent_corner_penalty > 0:
+                    score -= recent_corner_penalty  # Penalty for going back to corner with egg (overrides bonuses)
+                else:
                     if move_type == MoveType.EGG:
                         # Already handled above, but add extra for being at corner
-                        score += 200.0  # Extra bonus for egg move at accessible corner
+                        score += 200.0  # RESTORED from 100 - extra bonus for egg move at accessible corner
                     elif move_type == MoveType.PLAIN:
                         # Plain move to accessible corner - preparing to lay egg next turn
-                        score += 150.0  # Strong bonus for positioning at accessible corner
+                        score += 150.0  # RESTORED from 75 - strong bonus for positioning at accessible corner
 
         # 8. ESCAPE FROM EGG CLUSTERS: If we're near our own eggs, explore away!
         # This prevents circling around eggs we already laid
@@ -671,19 +740,34 @@ class MoveEvaluator:
                         for corner in corners_without_eggs
                     )
                     
-                    # MODERATE bonus for moving toward accessible corners WITHOUT eggs when in a loop
+                    # HUGE bonus for moving toward accessible corners WITHOUT eggs when in a loop
                     # Corners are clear targets that break loops
+                    # But recent corner penalty will override if we recently laid an egg there
                     if min_dist_to_accessible_corner <= 4:
-                        score += 300.0  # REDUCED from 600 - moderate bonus
+                        score += 600.0  # RESTORED: Very strong bonus for getting close to accessible corner
                     elif min_dist_to_accessible_corner <= 6:
-                        score += 150.0  # REDUCED from 300
+                        score += 300.0  # RESTORED: Good bonus for moderate distance
                     
-                    # EXTRA: If we're actually at an accessible corner WITHOUT egg, good bonus
+                    # EXTRA: If we're actually at an accessible corner WITHOUT egg, massive bonus
+                    # Check for recent corner penalty first
                     if new_loc in corners_without_eggs:
-                        if move_type == MoveType.EGG:
-                            score += 400.0  # REDUCED from 1000 - good bonus
-                        elif move_type == MoveType.PLAIN:
-                            score += 200.0  # REDUCED from 500
+                        recent_corner_penalty = 0.0
+                        if recent_positions is not None and len(recent_positions) >= 2:
+                            very_recent = recent_positions[-4:] if len(recent_positions) >= 4 else recent_positions
+                            for i, pos in enumerate(very_recent):
+                                if pos == new_loc and hasattr(board, 'eggs_player') and board.eggs_player:
+                                    if new_loc in board.eggs_player:
+                                        recency = len(very_recent) - i
+                                        recent_corner_penalty = 1500.0 * (1.0 / max(1, recency))
+                                        break
+                        
+                        if recent_corner_penalty > 0:
+                            score -= recent_corner_penalty  # Penalty overrides bonuses
+                        else:
+                            if move_type == MoveType.EGG:
+                                score += 1000.0  # RESTORED: HUGE bonus for egg at accessible corner
+                            elif move_type == MoveType.PLAIN:
+                                score += 500.0  # RESTORED: Strong bonus for positioning at accessible corner
                 else:
                     # All accessible corners have eggs - penalize going to them
                     if new_loc in accessible_corners:

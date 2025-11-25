@@ -38,7 +38,10 @@ class SearchEngine:
         trapdoor_tracker=None,
         visited_squares=None,
         recent_positions=None,
-        blocked_locations=None
+        blocked_locations=None,
+        is_oscillating=False,
+        loop_center=None,
+        force_outward_movement=False
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """
         Main search entry point.
@@ -72,7 +75,10 @@ class SearchEngine:
             trapdoor_tracker=trapdoor_tracker,
             visited_squares=visited_squares,
             recent_positions=recent_positions,
-            blocked_locations=blocked_locations
+            blocked_locations=blocked_locations,
+            is_oscillating=is_oscillating,
+            loop_center=loop_center,
+            force_outward_movement=force_outward_movement
         )
 
         return score, best_move
@@ -88,7 +94,10 @@ class SearchEngine:
         trapdoor_tracker=None,
         visited_squares=None,
         recent_positions=None,
-        blocked_locations=None
+        blocked_locations=None,
+        is_oscillating=False,
+        loop_center=None,
+        force_outward_movement=False
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """
         Minimax algorithm with alpha-beta pruning.
@@ -132,20 +141,23 @@ class SearchEngine:
         # Order moves for better pruning
         ordered_moves = self._order_moves(
             valid_moves, board, depth, trapdoor_tracker,
-            visited_squares, recent_positions, blocked_locations
+            visited_squares, recent_positions, blocked_locations,
+            is_oscillating, loop_center, force_outward_movement
         )
 
         if maximizing:
             score, move = self._maximize(
                 board, ordered_moves, depth, alpha, beta,
                 time_left, trapdoor_tracker,
-                visited_squares, recent_positions, blocked_locations
+                visited_squares, recent_positions, blocked_locations,
+                is_oscillating, loop_center, force_outward_movement
             )
         else:
             score, move = self._minimize(
                 board, ordered_moves, depth, alpha, beta,
                 time_left, trapdoor_tracker,
-                visited_squares, recent_positions, blocked_locations
+                visited_squares, recent_positions, blocked_locations,
+                is_oscillating, loop_center, force_outward_movement
             )
 
         # Store in transposition table
@@ -164,7 +176,10 @@ class SearchEngine:
         trapdoor_tracker=None,
         visited_squares=None,
         recent_positions=None,
-        blocked_locations=None
+        blocked_locations=None,
+        is_oscillating=False,
+        loop_center=None,
+        force_outward_movement=False
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """Maximizing player's turn"""
         max_score = float('-inf')
@@ -192,7 +207,8 @@ class SearchEngine:
                 score, _ = self._minimax(
                     forecast, depth - 1, alpha, beta, False,
                     time_left - 0.01, trapdoor_tracker,
-                    None, None, current_blocked  # Use updated blocked_locations
+                    None, None, current_blocked,  # Use updated blocked_locations
+                    is_oscillating, loop_center, force_outward_movement
                 )
                 forecast.reverse_perspective()
 
@@ -224,7 +240,10 @@ class SearchEngine:
         trapdoor_tracker=None,
         visited_squares=None,
         recent_positions=None,
-        blocked_locations=None
+        blocked_locations=None,
+        is_oscillating=False,
+        loop_center=None,
+        force_outward_movement=False
     ) -> Tuple[float, Optional[Tuple[Direction, MoveType]]]:
         """Minimizing player's turn"""
         min_score = float('inf')
@@ -249,7 +268,8 @@ class SearchEngine:
                 score, _ = self._minimax(
                     forecast, depth - 1, alpha, beta, True,
                     time_left - 0.01, trapdoor_tracker,
-                    None, None, current_blocked  # Use updated blocked_locations
+                    None, None, current_blocked,  # Use updated blocked_locations
+                    is_oscillating, loop_center, force_outward_movement
                 )
                 forecast.reverse_perspective()
 
@@ -275,7 +295,10 @@ class SearchEngine:
         trapdoor_tracker=None,
         visited_squares=None,
         recent_positions=None,
-        blocked_locations=None
+        blocked_locations=None,
+        is_oscillating=False,
+        loop_center=None,
+        force_outward_movement=False
     ) -> List[Tuple[Direction, MoveType]]:
         """
         Order moves for better alpha-beta pruning efficiency.
@@ -301,9 +324,14 @@ class SearchEngine:
                 score += 500.0
 
             # 4. Positional evaluation (now with position history for anti-repetition)
+            # CRITICAL: Pass force_outward_movement to evaluator so it influences move ordering
             score += self.evaluator.quick_evaluate_move(
                 move, board, trapdoor_tracker,
-                visited_squares, recent_positions, blocked_locations
+                visited_squares, recent_positions, blocked_locations,
+                just_respawned=False,
+                is_oscillating=is_oscillating,
+                loop_center=loop_center,
+                force_outward_movement=force_outward_movement
             )
 
             move_scores.append((score, move))
