@@ -114,20 +114,19 @@ class MoveEvaluator:
             endgame_multiplier = 2.0
 
         # 1. Egg moves are HIGHLY valuable (direct scoring) - EMPHASIZED!
-        # PRIORITY: Eggs are THE PRIMARY GOAL - make them extremely attractive!
+        # PRIORITY: Eggs are THE PRIMARY GOAL - but balanced to avoid loops
         if move_type == MoveType.EGG:
-            score += 6000.0 * endgame_multiplier  # INCREASED from 5000 - eggs are THE PRIMARY GOAL!
+            score += 4000.0 * endgame_multiplier  # REDUCED from 6000 - still strong but balanced
             
-            # EXTRA BONUS: Strongly encourage laying eggs, even in slightly risky situations
-            # This helps overcome trapdoor fear and encourages exploration
-            score += 500.0  # Base exploration bonus for egg moves
+            # EXTRA BONUS: Encourage laying eggs, but not extreme
+            score += 200.0  # Moderate exploration bonus for egg moves
 
             # DESPERATION BONUS: When we have few valid moves (trapped in corner), ALWAYS lay eggs!
             my_valid_moves = len(board.get_valid_moves())
             if my_valid_moves <= 3:
-                score += 10000.0  # DESPERATE - lay eggs when trapped!
+                score += 2000.0  # REDUCED from 10000 - strong but not extreme
             elif my_valid_moves <= 5:
-                score += 5000.0  # Limited mobility - prioritize eggs!
+                score += 1000.0  # REDUCED from 5000
 
             # Bonus for laying eggs in new/unexplored areas - encourages spreading eggs
             if visited_squares is None or new_loc not in visited_squares:
@@ -138,7 +137,7 @@ class MoveEvaluator:
 
             # Check if there's already an egg here (shouldn't happen, but just in case)
             if hasattr(board, 'eggs_player') and new_loc in board.eggs_player:
-                score -= 100000.0  # Can't lay egg where one already exists
+                score -= 50000.0  # REDUCED from 100000 - still strong but balanced
 
             # Bonus for laying eggs far from existing eggs (spread out, don't cluster)
             if hasattr(board, 'eggs_player') and board.eggs_player:
@@ -166,7 +165,7 @@ class MoveEvaluator:
                 # Check if this chicken can lay eggs on this corner (parity check)
                 can_lay_on_corner = board.chicken_player.can_lay_egg(new_loc)
                 if can_lay_on_corner:
-                    score += 1200.0  # INCREASED: HUGE bonus for accessible corner eggs! (3x value)
+                    score += 600.0  # REDUCED from 1200 - strong but balanced
                 else:
                     # Inaccessible corner - minimal bonus (can't lay eggs here anyway)
                     score += 20.0
@@ -194,18 +193,18 @@ class MoveEvaluator:
             elif move_type == MoveType.EGG:
                 # For egg moves: prefer unvisited squares even more!
                 if visited_squares is None or new_loc not in visited_squares:
-                    score += 1000.0  # MASSIVE bonus - new egg in new area!
+                    score += 300.0  # REDUCED from 1000 - good bonus but not extreme
                 else:
                     # Still good to lay eggs in visited squares, but prefer new ones
-                    score += 200.0  # Moderate bonus
+                    score += 100.0  # Moderate bonus
 
         # 1.6. Plain moves that help exploration are valuable
         # Plain moves are necessary to reach new egg-laying locations
-        # INCREASED bonuses to encourage exploration!
+        # Balanced bonuses to encourage exploration without causing loops
         if move_type == MoveType.PLAIN:
-            # MUCH STRONGER bonus for plain moves to new squares (encourages exploration)
+            # Moderate bonus for plain moves to new squares (encourages exploration)
             if visited_squares is None or new_loc not in visited_squares:
-                score += 200.0  # INCREASED from 40 - strong incentive to explore!
+                score += 80.0  # REDUCED from 200 - moderate incentive to explore
                 
                 # EXTRA bonus for exploring toward unvisited areas far from current position
                 # This encourages spreading out across the map
@@ -216,20 +215,20 @@ class MoveEvaluator:
                         for v in visited_squares
                     )
                     if min_dist_to_visited >= 4:
-                        score += 150.0  # Strong bonus for exploring far from known areas
+                        score += 60.0  # REDUCED from 150 - moderate bonus
                     elif min_dist_to_visited >= 3:
-                        score += 80.0
+                        score += 30.0  # REDUCED from 80
                     elif min_dist_to_visited >= 2:
-                        score += 40.0
+                        score += 15.0  # REDUCED from 40
                 
-                # AGGRESSIVE EXPLORATION BONUS: If we've laid few eggs, explore more aggressively!
+                # MODERATE EXPLORATION BONUS: If we've laid few eggs, explore more
                 # This encourages early-game exploration to find good egg-laying spots
                 if hasattr(board, 'eggs_player'):
                     eggs_laid = len(board.eggs_player) if board.eggs_player else 0
                     if eggs_laid <= 3:
-                        score += 300.0  # HUGE bonus for exploring when we have few eggs
+                        score += 100.0  # REDUCED from 300 - moderate bonus
                     elif eggs_laid <= 6:
-                        score += 150.0  # Good bonus for early exploration
+                        score += 50.0  # REDUCED from 150
                 
                 # CORNER EXPLORATION BONUS: Strongly encourage moving toward accessible corners
                 # These corners give 3x egg value, so they're extremely valuable targets!
@@ -294,7 +293,8 @@ class MoveEvaluator:
             if is_known_trapdoor:
                 # ABSOLUTE penalty for known trapdoors - never go there!
                 # This must be higher than any possible benefit (eggs, etc.)
-                score -= 1000000.0
+                # But reduced to prevent extreme score swings
+                score -= 50000.0  # REDUCED from 1000000 - still absolute but balanced
             else:
                 # REDUCED penalties to encourage exploration and egg-laying
                 # EGG MOVES: Much lighter penalties - eggs are worth calculated risks!
@@ -456,31 +456,31 @@ class MoveEvaluator:
                 if new_loc in recent_positions:
                     # Apply penalties ONLY if not oscillating
                     if not is_oscillating:
-                        # Strong penalty for recently visited squares (prevents tight loops)
+                        # REDUCED: Moderate penalty for recently visited squares (prevents tight loops)
                         recent_index = recent_positions.index(new_loc)
-                        # More recent = higher penalty
-                        recency_penalty = (len(recent_positions) - recent_index) * 200.0
-                        score -= (1000.0 + recency_penalty) * desperation_factor
+                        # More recent = higher penalty, but more gradual
+                        recency_penalty = (len(recent_positions) - recent_index) * 50.0  # REDUCED from 200
+                        score -= (300.0 + recency_penalty) * desperation_factor  # REDUCED from 1000
 
-                        # Extra penalty if this creates a loop (going back to same square multiple times)
+                        # REDUCED: Extra penalty if this creates a loop (going back to same square multiple times)
                         visit_count = recent_positions.count(new_loc)
                         if visit_count > 1:
-                            score -= visit_count * 600.0 * desperation_factor
+                            score -= visit_count * 150.0 * desperation_factor  # REDUCED from 600
 
                 # CRITICAL: Add STRONG tie-breaking to prevent oscillation
                 # Use multiple factors to ensure different moves have different scores
                 if my_valid_moves <= 6 or is_oscillating:
                     # Use location hash to add variation (breaks oscillation)
                     location_hash = (new_loc[0] * 1000 + new_loc[1]) % 1000
-                    score += location_hash * 5.0  # INCREASED tiebreaker bonus (0-5000)
+                    score += location_hash * 1.0  # REDUCED from 5.0 - moderate tiebreaker (0-1000)
 
-                    # STRONG preference for moves away from recent positions
+                    # MODERATE preference for moves away from recent positions
                     if len(recent_positions) >= 2:
                         # Calculate average of recent positions
                         avg_recent_x = sum(pos[0] for pos in recent_positions[-4:]) / min(4, len(recent_positions))
                         avg_recent_y = sum(pos[1] for pos in recent_positions[-4:]) / min(4, len(recent_positions))
                         dist_from_recent_center = abs(new_loc[0] - avg_recent_x) + abs(new_loc[1] - avg_recent_y)
-                        score += dist_from_recent_center * 500.0  # HUGE reward for escaping the area
+                        score += dist_from_recent_center * 150.0  # REDUCED from 500 - moderate reward
 
                     # Additional: prefer accessible corners/edges when stuck (forces movement)
                     # CRITICAL: Only incentivize corners where this chicken can lay eggs (parity check)
@@ -507,8 +507,8 @@ class MoveEvaluator:
                             # Lighter penalty for multiple visits (reduced from 250)
                             score -= visit_count * visit_count * 100.0 * desperation_factor  # Reduced from 250
                 else:
-                    # STRONGER bonus for exploring new squares with plain moves
-                    score += 300.0  # INCREASED from 150 - major incentive to explore!
+                    # Moderate bonus for exploring new squares with plain moves
+                    score += 150.0  # Balanced - good incentive but not extreme
 
                     # Extra bonus for exploring different regions of the map
                     region_bonus = self._get_region_exploration_bonus(new_loc, visited_squares)
@@ -642,18 +642,18 @@ class MoveEvaluator:
             # Calculate distance from new location to loop center
             new_dist_to_center = abs(new_loc[0] - loop_center[0]) + abs(new_loc[1] - loop_center[1])
             
-            # STRONG bonus for moving AWAY from loop center (breaking the loop)
+            # MODERATE bonus for moving AWAY from loop center (breaking the loop)
             if new_dist_to_center > current_dist_to_center:
                 distance_increase = new_dist_to_center - current_dist_to_center
-                score += distance_increase * 500.0  # HUGE bonus for breaking out of loop
-            # STRONG penalty for moving TOWARD loop center (staying in loop)
+                score += distance_increase * 200.0  # REDUCED from 500 - moderate bonus
+            # MODERATE penalty for moving TOWARD loop center (staying in loop)
             elif new_dist_to_center < current_dist_to_center:
                 distance_decrease = current_dist_to_center - new_dist_to_center
-                score -= distance_decrease * 800.0  # HUGE penalty for staying in loop
+                score -= distance_decrease * 300.0  # REDUCED from 800 - moderate penalty
             
             # EXTRA: Prefer moves to completely new areas when breaking loops
             if visited_squares is None or new_loc not in visited_squares:
-                score += 400.0  # Strong bonus for exploring new areas when breaking loops
+                score += 150.0  # REDUCED from 400 - moderate bonus
 
         # 11. PARITY-CORRECT CORNER TARGETING: Strongly incentivize accessible corners
         # This helps break loops by giving clear targets
@@ -671,26 +671,26 @@ class MoveEvaluator:
                         for corner in corners_without_eggs
                     )
                     
-                    # HUGE bonus for moving toward accessible corners WITHOUT eggs when in a loop
+                    # MODERATE bonus for moving toward accessible corners WITHOUT eggs when in a loop
                     # Corners are clear targets that break loops
                     if min_dist_to_accessible_corner <= 4:
-                        score += 600.0  # Very strong bonus for getting close to accessible corner
+                        score += 300.0  # REDUCED from 600 - moderate bonus
                     elif min_dist_to_accessible_corner <= 6:
-                        score += 300.0  # Good bonus for moderate distance
+                        score += 150.0  # REDUCED from 300
                     
-                    # EXTRA: If we're actually at an accessible corner WITHOUT egg, massive bonus
+                    # EXTRA: If we're actually at an accessible corner WITHOUT egg, good bonus
                     if new_loc in corners_without_eggs:
                         if move_type == MoveType.EGG:
-                            score += 1000.0  # HUGE bonus for egg at accessible corner
+                            score += 400.0  # REDUCED from 1000 - good bonus
                         elif move_type == MoveType.PLAIN:
-                            score += 500.0  # Strong bonus for positioning at accessible corner
+                            score += 200.0  # REDUCED from 500
                 else:
                     # All accessible corners have eggs - penalize going to them
                     if new_loc in accessible_corners:
                         if move_type == MoveType.PLAIN:
-                            score -= 1000.0  # Strong penalty - all corners done, don't loop here!
+                            score -= 400.0  # REDUCED from 1000 - moderate penalty
                         else:
-                            score -= 500.0
+                            score -= 200.0  # REDUCED from 500
 
         # 12. REDUCE TRAPDOOR ESCAPE WEIGHT when in loop
         # Trapdoor escape logic can cause overshoot cycles

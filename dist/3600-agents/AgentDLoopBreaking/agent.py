@@ -182,10 +182,14 @@ class PlayerAgent:
                 print(f"⚠ SMALL LOOP DETECTED! Count: {self.oscillation_count} | Positions: {positions_set} | Center: {self.loop_center}")
 
                 # SMART ACTION: Only clear recent_positions (keep visited_squares for exploration direction!)
+                # CRITICAL FIX: Don't clear ALL recent positions - keep last 2 to prevent immediate re-looping
                 if self.oscillation_count >= 2:
-                    print("🔄 BREAKING LOOP - Clearing recent positions only (keeping visited_squares for exploration direction)")
-                    self.recent_positions.clear()
-                    self.last_two_positions.clear()
+                    print("🔄 BREAKING LOOP - Partially clearing recent positions (keeping visited_squares for exploration direction)")
+                    # Keep last 2 positions to prevent squares from immediately becoming "new" again
+                    if len(self.recent_positions) > 2:
+                        self.recent_positions = self.recent_positions[-2:]
+                    if len(self.last_two_positions) > 2:
+                        self.last_two_positions = self.last_two_positions[-2:]
                     self.oscillation_count = 0
                     self.force_outward_movement = True  # Force movement away from loop center
                     print(f"   → Forcing outward movement from loop center: {self.loop_center}")
@@ -222,8 +226,10 @@ class PlayerAgent:
                 print(f"🚨 BIG LOOP DETECTED! Stuck at {most_visited} ({max_revisits} times) - Forcing outward movement!")
                 print(f"   → Loop center: {self.loop_center} - Will force movement away from this area")
                 
-                # SMART ACTION: Only clear recent_positions, keep visited_squares
-                self.recent_positions.clear()
+                # SMART ACTION: Partially clear recent_positions, keep visited_squares
+                # CRITICAL FIX: Keep last 2 positions to prevent immediate re-looping
+                if len(self.recent_positions) > 2:
+                    self.recent_positions = self.recent_positions[-2:]
                 # Allow revisiting the stuck square (but force movement away)
                 self.visited_squares.discard(most_visited)
 
