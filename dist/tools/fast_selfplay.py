@@ -7,8 +7,8 @@ from functools import partial
 
 # Configuration
 
-AGENT_A = "AgentD"
-AGENT_B = "AgentE"
+AGENT_A = "AgentEPro"
+AGENT_B = "AgentEProMax"
 
 GAMES = 24             # total number of games to run
 PARALLEL = 8           # number of processes to run simultaneously

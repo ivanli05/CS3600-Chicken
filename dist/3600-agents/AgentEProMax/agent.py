@@ -15,6 +15,10 @@ from .trapdoor_tracker import TrapdoorTracker
 from .search_engine import SearchEngine
 from .heuristics import MoveEvaluator
 
+# Hyperparameters - adjust these to tune agent behavior
+MAXDEPTH = 7  # Moderate depth for balanced performance
+TIME_LIMIT = 0.8  # Fraction of remaining time to use per move
+
 class PlayerAgent:
     def __init__(self, board: board_module.Board, time_left: Callable):
         self.map_size = board.game_map.MAP_SIZE
@@ -23,8 +27,8 @@ class PlayerAgent:
         
         self.search_engine = SearchEngine(
             evaluator=self.move_evaluator,
-            max_depth=9,  # Iterative deepening up to depth 20
-            time_limit=0.8
+            max_depth=MAXDEPTH,
+            time_limit=TIME_LIMIT
         )
         
         self.turn_count = 0
@@ -81,64 +85,7 @@ class PlayerAgent:
                 # but we return a dummy move to prevent a crash.
                 return (Direction.UP, MoveType.PLAIN)
         
-        print(f"\n--- DEBUGGING TURN {self.turn_count} ---")
-        # We check the first few moves in safe_moves
-        moves_to_check = safe_moves[:1]
-        
-        for move in moves_to_check:
-            # We must forecast the move to evaluate the resulting board state
-            # check_ok=False is safe here because we pulled these from get_valid_moves
-            sim_board = board.forecast_move(move[0], move[1], check_ok=False)
-            if sim_board:
-                move_str = f"{move[0].name}_{move[1].name}"
-                # Call the debug function you added to heuristics.py
-                self.move_evaluator.debug_evaluate_position(
-                    sim_board, 
-                    self.trapdoor_tracker, 
-                    move_name=move_str
-                )
-        print("-----------------------------------")
-
-        # 3. Smart Turds (Strategic Blocking)
-        # Check if placing a turd reduces the opponent's "Egg Count" heuristic
-        best_turd_move = None
-        max_turd_impact = 0.0
-        turd_moves = [m for m in safe_moves if m[1] == MoveType.TURD]
-        turds_left = board.chicken_player.get_turds_left()
-        
-        if turds_left > 0:
-            # 1. Get enemy potential BEFORE the move
-            enemy_potential_before, _ = self.move_evaluator._analyze_reachability(board, is_me=False, trapdoor_tracker=None)
-            
-            for move in turd_moves:
-                # FIX: Remove check_ok=False. We NEED the full update to register the turd.
-                forecast = board.forecast_move(move[0], move[1])
-                
-                if forecast:
-                    # 2. Check enemy potential AFTER the move
-                    enemy_potential_after, _ = self.move_evaluator._analyze_reachability(forecast, is_me=False, trapdoor_tracker=None)
-                    
-                    impact = enemy_potential_before - enemy_potential_after
-                    
-                    # Logic: If we have lots of turds, use them more loosely (+1 bonus).
-                    # Otherwise, require a solid impact (>= 2.0 reduction in enemy potential).
-                    score_bonus = 1.0 if turds_left >= 3 else 0.0
-                    
-                    if (impact + score_bonus) >= 2.0: 
-                        if impact > max_turd_impact:
-                            max_turd_impact = impact
-                            best_turd_move = move
-
-            if best_turd_move and max_turd_impact >= 2.0:
-                print(f"!!! STRATEGIC TURD: Denied {max_turd_impact:.2f} enemy potential!")
-                # Verify safety one last time with a quick depth-1 check to avoid suicide
-                check_board = board.forecast_move(best_turd_move[0], best_turd_move[1])
-                safety_score = self.move_evaluator.evaluate_position(check_board, self.trapdoor_tracker)
-                
-                if safety_score > -5000: # As long as we don't die instantly
-                    self.last_move_attempt = loc_after_direction(my_loc, best_turd_move[0])
-                    return best_turd_move
-        # 4. Search
+        # 3. Search (removed pre-search turd logic - let minimax decide)
         score, best_move = self.search_engine.search(
             board, 
             time_left, 

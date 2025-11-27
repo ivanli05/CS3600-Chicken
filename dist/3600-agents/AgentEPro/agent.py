@@ -15,6 +15,10 @@ from .trapdoor_tracker import TrapdoorTracker
 from .search_engine import SearchEngine
 from .heuristics import MoveEvaluator
 
+# Hyperparameters - adjust these to tune agent behavior
+MAXDEPTH = 7  # Moderate depth for balanced performance
+TIME_LIMIT = 0.8  # Fraction of remaining time to use per move
+
 class PlayerAgent:
     def __init__(self, board: board_module.Board, time_left: Callable):
         self.map_size = board.game_map.MAP_SIZE
@@ -23,8 +27,8 @@ class PlayerAgent:
         
         self.search_engine = SearchEngine(
             evaluator=self.move_evaluator,
-            max_depth=9,  # Iterative deepening up to depth 20
-            time_limit=0.8
+            max_depth=MAXDEPTH,
+            time_limit=TIME_LIMIT
         )
         
         self.turn_count = 0
@@ -83,7 +87,8 @@ class PlayerAgent:
         
         print(f"\n--- DEBUGGING TURN {self.turn_count} ---")
         # We check the first few moves in safe_moves
-        moves_to_check = safe_moves[:1]
+        # moves_to_check = safe_moves
+        moves_to_check = []
         
         for move in moves_to_check:
             # We must forecast the move to evaluate the resulting board state
