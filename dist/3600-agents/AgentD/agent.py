@@ -69,12 +69,10 @@ class PlayerAgent:
             if location == spawn_location and location != self.last_location:
                 # TRAPDOOR HIT - we respawned!
                 self.trapdoor_tracker.mark_trapdoor_found(self.last_move_target)
-                print(f"🚨 TRAPDOOR at {self.last_move_target}")
                 self.visited_squares.add(self.last_move_target)
 
                 # CRITICAL FIX: Clear recent position history to explore new areas!
                 # After respawning, we should NOT be penalized for revisiting old squares
-                print(f"🔄 RESPAWNED! Clearing recent position history to explore new areas...")
                 self.recent_positions.clear()
                 self.just_respawned = True
                 # Keep visited_squares but clear recent memory - fresh exploration!
@@ -82,7 +80,6 @@ class PlayerAgent:
             elif location != self.last_move_target and location == self.last_location:
                 if self.last_move_target not in self.trapdoor_tracker.known_trapdoors:
                     self.blocked_locations.add(self.last_move_target)
-                    print(f"🚫 BLOCKED at {self.last_move_target}")
 
         # Update from board state
         if hasattr(board, 'found_trapdoors'):
@@ -105,11 +102,7 @@ class PlayerAgent:
         self.visited_squares.add(location)
         self.last_location = location
 
-        # Print turn info
-        self._print_turn_info(board, sensor_data, time_left)
-
         if board.is_game_over():
-            self._print_game_over(board)
             return (Direction.UP, MoveType.PLAIN)
 
         # Update trapdoor beliefs
@@ -118,7 +111,6 @@ class PlayerAgent:
         danger = self.trapdoor_tracker.get_danger_score(location)
         if danger > 0.8:
             self.trapdoor_tracker.mark_trapdoor_found(location)
-            print(f"⚠ Marked trapdoor at {location} (prob: {danger:.1%})")
 
         # Track positions
         self.position_history.append(location)
@@ -132,7 +124,6 @@ class PlayerAgent:
         # Reset just_respawned flag after a few moves
         if self.just_respawned and len(self.recent_positions) >= 3:
             self.just_respawned = False
-            print("✓ Respawn period over - back to normal exploration")
 
         # AGGRESSIVE OSCILLATION DETECTION: Detect ANY repetitive patterns
         self.last_two_positions.append(location)
@@ -146,11 +137,9 @@ class PlayerAgent:
             # Stuck in a small loop (2-4 unique positions)
             if len(positions_set) <= 3:
                 self.oscillation_count += 1
-                print(f"⚠ LOOP DETECTED! Count: {self.oscillation_count} | Positions: {positions_set}")
 
                 # IMMEDIATE ACTION after just 2 detections
                 if self.oscillation_count >= 2:
-                    print("🚨 BREAKING LOOP - Clearing all position memory!")
                     # Nuclear option: clear ALL position tracking
                     self.recent_positions.clear()
                     self.visited_squares.clear()  # Even clear visited squares!
@@ -158,8 +147,6 @@ class PlayerAgent:
                     self.oscillation_count = 0
             else:
                 # Good movement - reset counter
-                if self.oscillation_count > 0:
-                    print("✓ Loop broken - resuming normal exploration")
                 self.oscillation_count = 0
 
         # ALSO: If we've revisited the same square 3 times in recent history, clear memory
@@ -171,14 +158,12 @@ class PlayerAgent:
             max_revisits = max(position_counts.values())
             if max_revisits >= 3:
                 most_visited = [pos for pos, count in position_counts.items() if count == max_revisits]
-                print(f"🚨 STUCK at {most_visited[0]} ({max_revisits} times) - Clearing memory!")
                 self.recent_positions.clear()
                 self.visited_squares.discard(most_visited[0])  # Allow revisiting this square
 
         # Get valid moves
         valid_moves = board.get_valid_moves()
         if not valid_moves:
-            print("⚠ No valid moves!")
             return (Direction.UP, MoveType.PLAIN)
 
         # Filter out dangerous moves BUT ALLOW EGG MOVES (eggs are worth the risk!)
@@ -193,11 +178,9 @@ class PlayerAgent:
             if move_type == MoveType.EGG:
                 # Still filter known trapdoors and physically blocked locations
                 if target_loc in self.trapdoor_tracker.known_trapdoors:
-                    print(f"⚠ Filtered EGG move to known trapdoor at {target_loc}")
                     continue
 
                 if target_loc in self.blocked_locations or board.is_cell_blocked(target_loc):
-                    print(f"⚠ Filtered EGG move to blocked location at {target_loc}")
                     continue
 
                 # Allow risky egg moves! Let heuristics decide risk/reward
@@ -207,38 +190,28 @@ class PlayerAgent:
 
             # For PLAIN and TURD moves: apply safety filters
             if target_loc in self.trapdoor_tracker.known_trapdoors:
-                print(f"⚠ Filtered known trapdoor at {target_loc}")
                 continue
 
             if target_loc in self.blocked_locations:
-                print(f"⚠ Filtered blocked location at {target_loc}")
                 continue
 
             if board.is_cell_blocked(target_loc):
                 self.blocked_locations.add(target_loc)
-                print(f"⚠ Filtered blocked (board) at {target_loc}")
                 continue
 
             danger = self.trapdoor_tracker.get_danger_score(target_loc)
             if danger > 0.3:
-                print(f"⚠ Filtered high-risk at {target_loc} (danger: {danger:.1%})")
                 continue
 
             safe_moves.append(move)
 
         if not safe_moves:
-            print("⚠ All moves filtered! Using originals with penalties...")
             safe_moves = valid_moves
         else:
             valid_moves = safe_moves
-            if egg_moves:
-                print(f"Safe moves: {len(valid_moves)} (including {len(egg_moves)} EGG moves)")
-            else:
-                print(f"Safe moves: {len(valid_moves)}")
 
         # Strategy 0: EGG-FIRST! If we can lay an egg, do it immediately!
         if egg_moves:
-            print(f"[EGG-FIRST] {len(egg_moves)} egg moves available - prioritizing eggs!")
             best_egg = self._choose_best_egg_move(board, egg_moves)
             if best_egg:
                 return best_egg
@@ -254,7 +227,6 @@ class PlayerAgent:
             return best_move
 
         # Fallback
-        print("[FALLBACK] Using heuristic evaluation...")
         return self._fallback_move(board, valid_moves)
 
     def _choose_best_egg_move(self, board: board_module.Board, egg_moves: List[Tuple[Direction, MoveType]]) -> Optional[Tuple[Direction, MoveType]]:
@@ -266,12 +238,10 @@ class PlayerAgent:
         if len(egg_moves) == 1:
             direction, move_type = egg_moves[0]
             new_loc = loc_after_direction(board.chicken_player.get_location(), direction)
-            print(f"[EGG] {Direction(direction).name} + EGG → {new_loc} (only option)")
             self.last_move_target = new_loc
             return egg_moves[0]
 
         # Multiple egg moves - use MINIMAX to evaluate strategic value!
-        print(f"[EGG-EVAL] Evaluating {len(egg_moves)} egg moves with minimax...")
         best_egg = None
         best_score = float('-inf')
 
@@ -353,7 +323,6 @@ class PlayerAgent:
         if best_egg:
             direction, move_type = best_egg
             new_loc = loc_after_direction(board.chicken_player.get_location(), direction)
-            print(f"[EGG] {Direction(direction).name} + EGG → {new_loc} (minimax score: {best_score:.1f})")
             self.last_move_target = new_loc
             return best_egg
 
@@ -365,8 +334,6 @@ class PlayerAgent:
 
         if not trapping_moves:
             return None
-
-        print(f"[TRAP] Found {len(trapping_moves)} potential traps")
 
         best_trap_move = None
         best_trap_score = float('-inf')
@@ -420,7 +387,6 @@ class PlayerAgent:
             if danger > 0.3:
                 return None
 
-            print(f"[TRAP] {Direction(direction).name} + {MoveType(move_type).name} → {new_loc} (score: {best_trap_score:.1f})")
             self.last_move_target = new_loc
             return best_trap_move
 
@@ -429,8 +395,6 @@ class PlayerAgent:
     def _search_best_move(self, board: board_module.Board, time_left: Callable) -> Optional[Tuple[Direction, MoveType]]:
         """Use minimax search with PURE HEURISTICS (no neural network)."""
         try:
-            print(f"[SEARCH] Minimax (depth={self.search_engine.max_depth}) - PURE HEURISTICS")
-
             score, best_move = self.search_engine.search(
                 board=board,
                 time_left=time_left,
@@ -456,15 +420,12 @@ class PlayerAgent:
                 if danger > 0.3:
                     return None
 
-                print(f"[MOVE] {Direction(direction).name} + {MoveType(move_type).name} → {new_loc}")
-                print(f"       Heuristic eval: {score:.1f}")
-
                 self.search_engine.record_best_move(best_move, self.search_engine.max_depth)
                 self.last_move_target = new_loc
                 return best_move
 
-        except Exception as e:
-            print(f"[ERROR] Search failed: {e}")
+        except Exception:
+            pass
 
         return None
 
@@ -509,57 +470,9 @@ class PlayerAgent:
 
         if best_move is None and move_scores:
             best_score, best_move = move_scores[0]
-            print("⚠ All fallback moves filtered!")
 
         direction, move_type = best_move
         new_loc = loc_after_direction(board.chicken_player.get_location(), direction)
 
-        print(f"[MOVE] {Direction(direction).name} + {MoveType(move_type).name} → {new_loc}")
-        print(f"       Score: {best_score:.1f}")
-
         self.last_move_target = new_loc
         return best_move
-
-    def _print_turn_info(self, board: board_module.Board, sensor_data: List[Tuple[bool, bool]], time_left: Callable):
-        """Print turn information."""
-        location = board.chicken_player.get_location()
-        my_eggs = board.chicken_player.get_eggs_laid()
-        enemy_eggs = board.chicken_enemy.get_eggs_laid()
-        turns_left = board.turns_left_player
-
-        print(f"\n{'=' * 60}")
-        print(f"AgentPro [NO NN] - Turn {self.turn_count}")
-        print(f"{'=' * 60}")
-        print(f"Position: {location}")
-        print(f"Eggs: Me={my_eggs} | Enemy={enemy_eggs} | Diff={my_eggs - enemy_eggs:+d}")
-        print(f"Turns left: {turns_left}")
-        print(f"Time: {time_left():.2f}s")
-
-        heard_w, felt_w = sensor_data[0]
-        heard_b, felt_b = sensor_data[1]
-        print(f"Sensors: W[H={heard_w},F={felt_w}] | B[H={heard_b},F={felt_b}]")
-
-        likely_traps = self.trapdoor_tracker.get_most_likely_trapdoors(3)
-        if likely_traps:
-            print("Likely trapdoors:")
-            for (x, y), prob in likely_traps:
-                color = "white" if (x + y) % 2 == 0 else "black"
-                print(f"  ({x},{y}) [{color}]: {prob:.1%}")
-
-    def _print_game_over(self, board: board_module.Board):
-        """Print game over info."""
-        my_eggs = board.chicken_player.get_eggs_laid()
-        enemy_eggs = board.chicken_enemy.get_eggs_laid()
-
-        print(f"\n{'=' * 60}")
-        print(f"GAME OVER!")
-        print(f"{'=' * 60}")
-
-        if my_eggs > enemy_eggs:
-            print(f"✓ WIN! ({my_eggs} vs {enemy_eggs})")
-        elif enemy_eggs > my_eggs:
-            print(f"✗ LOSS ({enemy_eggs} vs {my_eggs})")
-        else:
-            print(f"⚖ TIE ({my_eggs})")
-
-        print(f"{'=' * 60}\n")
